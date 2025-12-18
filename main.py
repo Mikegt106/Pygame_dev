@@ -3,6 +3,7 @@ from entities import Player
 from enemies import Zombie
 from config import PLAYER, PROJECTILES, ZOMBIE, DAMAGE
 from ui_statbar import StatBarUI
+from spawner import EnemySpawner
 
 pygame.init()
 font = pygame.font.SysFont(None, 36)
@@ -10,13 +11,28 @@ font_big = pygame.font.SysFont(None, 120)
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 
-# ✅ maak UI pas na pygame.init()
 statui = StatBarUI()
 
+WORLD_WIDTH = 6000
+
+spawner = EnemySpawner(
+    enemy_cls=Zombie,
+    enemy_cfg=ZOMBIE,
+    spawn_y=680,
+    interval_min=1.2,
+    interval_max=2.5,
+    max_enemies=6,
+    min_dist_from_player=250,
+    spawn_ahead_min=400,
+    spawn_ahead_max=900,
+    spawn_behind_chance=0.20,
+)
+
 def reset_game():
+    spawner.reset()
     player = Player(640, 680, PLAYER)
     projectiles = []
-    zombies = [Zombie(300, 680, ZOMBIE)]
+    zombies = []
     return player, projectiles, zombies
 
 player, projectiles, zombies = reset_game()
@@ -28,7 +44,6 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
         if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
             player, projectiles, zombies = reset_game()
 
@@ -37,23 +52,33 @@ while running:
     if not player.dead:
         player.update(keys, dt, projectiles, PROJECTILES)
 
-        for p in projectiles:
-            p.update(dt)
+        # spawn
+        spawner.update(dt, player, zombies, world_width=WORLD_WIDTH)
 
+        # enemies update
         for z in zombies:
             z.update(dt, player)
 
+        # projectiles update
+        for p in projectiles:
+            p.update(dt)
+
+        # collisions
         for p in projectiles:
             for z in zombies:
-                if p.rect.colliderect(z.rect) and not z.dead:
+                if p.rect.colliderect(z.rect) and (not z.dead):
                     z.take_damage(DAMAGE["book"])
                     p.age = p.lifetime
 
         projectiles = [p for p in projectiles if not p.is_dead()]
+
+        # remove zombies that finished dying
+        zombies = [z for z in zombies if not getattr(z, "remove", False)]
+
     else:
         player.update(keys, dt, projectiles, PROJECTILES)
 
-    # ✅ update bar values (mana later uit player)
+    # UI
     statui.set_values(
         hp=player.hp,
         mana=int(player.mana),
@@ -65,7 +90,7 @@ while running:
     )
     statui.update(dt)
 
-    # draw
+    # DRAW
     screen.fill((20, 20, 20))
     statui.draw(screen)
     player.draw(screen)
@@ -78,7 +103,6 @@ while running:
         text = font_big.render("YOU DIED", True, (255, 255, 255))
         rect = text.get_rect(center=(1280 // 2, 120))
         screen.blit(text, rect)
-
         tip = font.render("Press R to respawn", True, (255, 255, 255))
         screen.blit(tip, (20, 60))
 

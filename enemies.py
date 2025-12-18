@@ -1,3 +1,4 @@
+# enemies.py
 import pygame
 from animation import SpriteSheet, Animator
 
@@ -7,7 +8,15 @@ class Zombie:
         self.facing_right = False
         self.speed = config.get("speed", 120)
         self.hp = config.get("hp", 5)
+
+        # life state
         self.dead = False
+        self.remove = False
+
+        # death timing + fade
+        self.death_linger = config.get("death_linger", 1.2)
+        self.fade_duration = config.get("fade_duration", 0.6)
+        self.death_timer = 0.0  # counts down
 
         # --- ATTACK ---
         self.attack_damage = config.get("attack_damage", 1)
@@ -52,33 +61,27 @@ class Zombie:
         self.rect.midbottom = (x, y)
         self.pos = pygame.Vector2(self.rect.midbottom)
 
-        # --- grayscale cache (per frame surface) ---
-        self._gray_cache = {}  # key = id(surface) -> gray_surface
+        # grayscale cache
+        self._gray_cache = {}
 
     # ------------------------------------------------------------
     # HELPERS
     # ------------------------------------------------------------
     def _get_grayscale(self, surf: pygame.Surface) -> pygame.Surface:
-        """Return cached grayscale version of surf (fast after first time)."""
         key = id(surf)
         cached = self._gray_cache.get(key)
         if cached is not None:
             return cached
 
-        # ensure we have alpha
         s = surf.convert_alpha()
-        arr = pygame.surfarray.array3d(s)  # (w,h,3)
+        arr = pygame.surfarray.array3d(s)
 
-        # luminance grayscale
-        # gray = 0.299R + 0.587G + 0.114B
         gray = (arr[:, :, 0] * 0.299 + arr[:, :, 1] * 0.587 + arr[:, :, 2] * 0.114).astype(arr.dtype)
         arr[:, :, 0] = gray
         arr[:, :, 1] = gray
         arr[:, :, 2] = gray
 
         gray_surf = pygame.surfarray.make_surface(arr).convert_alpha()
-
-        # restore alpha from original
         alpha = pygame.surfarray.array_alpha(s)
         pygame.surfarray.pixels_alpha(gray_surf)[:, :] = alpha
 
@@ -95,6 +98,7 @@ class Zombie:
         self.hp -= amount
         if self.hp <= 0:
             self.dead = True
+            self.death_timer = self.death_linger
             self.anim.play("dead", reset_if_same=True)
             return
 
@@ -102,7 +106,6 @@ class Zombie:
             self.anim.play("hurt", reset_if_same=True)
 
     def stun(self, duration: float | None = None):
-        """Called when player successfully blocks (parry)."""
         dur = self.stun_duration if duration is None else duration
         self.stun_timer = max(self.stun_timer, dur)
 
@@ -111,10 +114,9 @@ class Zombie:
         self.attack_hit_done = True
         self.cooldown_timer = max(self.cooldown_timer, 0.25)
 
-        # after stun: walk slower for a bit
+        # after stun: slow walk
         self.slow_timer = max(self.slow_timer, self.slow_duration)
 
-        # keep current anim, or optionally show hurt
         if "hurt" in self.anim.animations:
             self.anim.play("hurt", reset_if_same=True)
 
@@ -131,26 +133,25 @@ class Zombie:
     # UPDATE
     # ------------------------------------------------------------
     def update(self, dt: float, player):
-        # cooldown
         if self.cooldown_timer > 0:
             self.cooldown_timer = max(0.0, self.cooldown_timer - dt)
 
-        # post-stun slow timer
         if self.slow_timer > 0:
             self.slow_timer = max(0.0, self.slow_timer - dt)
 
-        # death
+        # DEAD: blijf anim updaten + timer -> remove
         if self.dead:
             self.anim.update(dt)
+            self.death_timer = max(0.0, self.death_timer - dt)
+            if self.death_timer <= 0.0:
+                self.remove = True
+            self.rect.midbottom = self.pos
             return
 
-        # --- STUN BLOCKS EVERYTHING ---
+        # STUN: blokkeert alles
         if self.stun_timer > 0:
             self.stun_timer = max(0.0, self.stun_timer - dt)
-
-            # ✅ anim slower during stun
             self.anim.update(dt * self.stun_anim_speed)
-
             self.rect.midbottom = self.pos
             return
 
@@ -162,7 +163,7 @@ class Zombie:
             self.rect.midbottom = self.pos
             return
 
-        # --- ATTACK STATE ---
+        # attack state
         if self.anim.state == "attack":
             self.anim.update(dt)
             self.attack_timer += dt
@@ -180,7 +181,7 @@ class Zombie:
             self.rect.midbottom = self.pos
             return
 
-        # --- AI ---
+        # AI chase
         dx = player.rect.centerx - self.rect.centerx
         dist = abs(dx)
 
@@ -190,7 +191,6 @@ class Zombie:
             self.rect.midbottom = self.pos
             return
 
-        # walk towards player
         if dist < 5:
             self.anim.play("idle")
             self.anim.update(dt)
@@ -212,13 +212,22 @@ class Zombie:
     def draw(self, screen: pygame.Surface):
         img = self.anim.get_image(self.facing_right)
 
+        # dead fade (laat dead anim zichtbaar, maar fade in laatste fade_duration)
+        if self.dead and self.fade_duration > 0:
+            t = self.death_timer
+            if t < self.fade_duration:
+                alpha = int(255 * (t / self.fade_duration))
+                alpha = max(0, min(255, alpha))
+                fx = img.copy()
+                fx.set_alpha(alpha)
+                screen.blit(fx, self.rect)
+                return
+
+        # stun visual
         if self.stun_timer > 0:
             gray = self._get_grayscale(img)
-
-            # extra “frozen” tint (optioneel, maar zichtbaar)
             fx = gray.copy()
             fx.fill((15, 25, 45), special_flags=pygame.BLEND_RGB_ADD)
-
             screen.blit(fx, self.rect)
         else:
             screen.blit(img, self.rect)
