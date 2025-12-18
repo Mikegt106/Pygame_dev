@@ -15,6 +15,7 @@ class EnemyBase:
         self.facing_right = False
         self.speed = float(config.get("speed", 120))
         self.hp = int(config.get("hp", 5))
+        self.alpha = 255
 
         # life state
         self.dead = False
@@ -88,9 +89,18 @@ class EnemyBase:
         # death
         if self.dead:
             self.anim.update(dt)
-            self.death_timer -= dt
-            if self.death_timer <= 0:
+
+            self.death_timer = max(0.0, self.death_timer - dt)
+
+            # ✅ fade alpha van 255 -> 0 over death_linger
+            if self.death_linger > 0:
+                self.alpha = int(255 * (self.death_timer / self.death_linger))
+            else:
+                self.alpha = 0
+
+            if self.death_timer <= 0.0:
                 self.remove = True
+
             self.rect.midbottom = self.pos
             return
 
@@ -115,4 +125,10 @@ class EnemyBase:
     # -------------------------
     def draw(self, screen: pygame.Surface):
         img = self.anim.get_image(self.facing_right)
+
+        # ✅ apply fade when dead
+        if self.dead and self.alpha < 255:
+            img = img.copy()
+            img.set_alpha(self.alpha)
+
         screen.blit(img, self.rect)

@@ -1,3 +1,6 @@
-from .registry import get_enemy_class, ENEMY_REGISTRY
-from .zombie import Zombie
-from .zombie2 import Zombie2
+# entities/enemies/__init__.py
+from .registry import get_enemy_class, ENEMY_REGISTRY, register_enemy
+
+# Import enemy modules so they register themselves
+from . import zombie
+from . import zombie2

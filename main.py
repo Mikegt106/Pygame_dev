@@ -97,7 +97,7 @@ while running:
     screen.fill((20, 20, 20))
 
     wave_text = font.render(f"WAVE {wave_sys.wave} - {wave_sys.state}", True, (255, 255, 255))
-    screen.blit(wave_text, (20, 20))
+    screen.blit(wave_text, (95, 10))
 
     statui.draw(screen)
     player.draw(screen)
