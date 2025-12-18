@@ -10,6 +10,7 @@ class Player:
 
         # input
         self.attack_key_prev = False
+        self.jump_key_prev = False
 
         # attack (projectile timing)
         self.attack_timer = 0.0
@@ -31,9 +32,6 @@ class Player:
         # hurt state
         self.hurt_timer = 0.0
         self.hurt_duration = 0.25
-
-        # jump state (simpel: anim while key held)
-        self.is_jumping = False
 
         # config
         scale = config.get("scale", 2)
@@ -79,8 +77,22 @@ class Player:
             sprint_speed=config.get("sprint_speed", 420),
         )
 
+        # ---- JUMP / PHYSICS ----
+        self.vel_y = 0.0
+        self.gravity = 2600.0
+        self.jump_strength = 950.0
+        self.on_ground = True
+
+        # jump anim sync (progress-based)
+        self.jump_t = 0.0
+        self.jump_total = (2 * self.jump_strength) / self.gravity
+
+        # fixed ground (for now)
+        self.ground_y = y
+
         # state
         self.dead = False
+        self.dead_vel_x = 0.0  # forward drift after death
 
     def update(self, keys, dt: float, projectiles: list, projectile_cfg: dict):
         # ----- inputs -----
@@ -90,6 +102,11 @@ class Player:
         self.attack_key_prev = attack_now
 
         protecting = keys[pygame.K_e]
+
+        # --- Jump input (just pressed) ---
+        jump_now = keys[pygame.K_SPACE]
+        jump_pressed = jump_now and not self.jump_key_prev
+        self.jump_key_prev = jump_now
 
         # ----- timers -----
         if self.slow_timer > 0:
@@ -101,15 +118,44 @@ class Player:
         if self.damage_timer > 0:
             self.damage_timer = max(0.0, self.damage_timer - dt)
 
+        # ---- START JUMP (only if grounded and allowed) ----
+        # (Do this BEFORE physics update so jump starts instantly)
+        if jump_pressed and self.on_ground and (self.anim.state != "attack") and (not protecting) and (not self.dead):
+            self.vel_y = -self.jump_strength
+            self.on_ground = False
+            self.jump_t = 0.0
+            self.jump_total = (2 * self.jump_strength) / self.gravity
+
+        # =========================================================
+        # ✅ PHYSICS ALWAYS (so hurt/dead never "hang" mid-air)
+        # =========================================================
+        self.vel_y += self.gravity * dt
+        self.pos.y += self.vel_y * dt
+
+        # ground collision
+        if self.pos.y >= self.ground_y:
+            self.pos.y = self.ground_y
+            self.vel_y = 0.0
+            self.on_ground = True
+        else:
+            self.on_ground = False
+
+        # horizontal drift while dead
+        if self.dead:
+            self.pos.x += self.dead_vel_x * dt
+            if self.on_ground:
+                self.dead_vel_x *= 0.85  # friction on ground
+
         # ----- PRIORITY STATES -----
 
         # DEAD: play death sheet, no input/movement
         if self.dead:
             self.anim.play("dead")
             self.anim.update(dt)
+            self.rect.midbottom = self.pos
             return
 
-        # HURT: short stun, blocks input/movement
+        # HURT: short stun, blocks input/movement BUT still falls due to physics above
         if self.hurt_timer > 0:
             self.hurt_timer = max(0.0, self.hurt_timer - dt)
             self.anim.play("hurt")
@@ -123,17 +169,30 @@ class Player:
         moving = False
         sprinting = False
         if can_move:
+            air_mult = 1.6 if not self.on_ground else 1.0  # forward momentum in air
             moving, facing_right, sprinting = self.movement.update_horizontal(
-                keys, self.pos, dt, speed_mult
+                keys, self.pos, dt, speed_mult * air_mult
             )
             if moving:
                 self.facing_right = facing_right
 
-        # JUMP (simpel): zolang SPACE wordt ingedrukt -> jump anim
-        # (Later kan je hier echte jump physics aan koppelen)
-        if keys[pygame.K_SPACE] and (self.anim.state != "attack") and (not protecting):
+        # ---- JUMP ANIM SYNC (NO MID-AIR END) ----
+        if (not self.on_ground) and ("jump" in self.anim.animations) and (self.anim.state != "attack") and (not protecting):
+            self.jump_t += dt
+            progress = 0.0 if self.jump_total <= 0 else (self.jump_t / self.jump_total)
+            progress = max(0.0, min(1.0, progress))
+
             self.anim.play("jump")
-            self.anim.update(dt)
+
+            frames = self.anim.animations["jump"]["right"]
+            n = len(frames)
+
+            idx = int(progress * (n - 1))
+            idx = max(0, min(n - 1, idx))
+
+            self.anim.current_frame = idx
+            self.anim.timer = 0.0
+
             self.rect.midbottom = self.pos
             return
 
@@ -146,7 +205,7 @@ class Player:
             if (self.attack_timer >= self.attack_delay) and (not self.attack_spawned):
                 direction = 1 if self.facing_right else -1
                 spawn_x = self.rect.centerx + (30 * direction)
-                spawn_y = self.rect.centery + 50  # handhoogte tweak
+                spawn_y = self.rect.centery + 50
 
                 projectiles.append(
                     BookProjectile(spawn_x, spawn_y, direction, projectile_cfg["book"])
@@ -163,12 +222,13 @@ class Player:
                 self.attack_spawned = False
 
             elif protecting:
-                # protection is stance: no anim.update() (keeps frame 0)
                 self.anim.play("protect")
 
             elif moving:
-                # run when sprinting
-                self.anim.play("run" if sprinting else "walk")
+                if sprinting and ("run" in self.anim.animations):
+                    self.anim.play("run")
+                else:
+                    self.anim.play("walk")
                 self.anim.update(dt)
 
             else:
@@ -194,6 +254,10 @@ class Player:
         if self.hp == 0:
             self.dead = True
             self.anim.play("dead", reset_if_same=True)
+
+            # keep momentum: drift in facing direction (gravity continues in update)
+            direction = 1 if self.facing_right else -1
+            self.dead_vel_x = direction * 260.0  # tweak (200-450)
 
     def draw(self, screen: pygame.Surface):
         img = self.anim.get_image(self.facing_right)
