@@ -1,24 +1,21 @@
 # wave_system.py
 
 class WaveSystem:
-    def __init__(
-        self,
-        break_time: float = 4.0,
-        fight_time: float = 18.0,
-        interval_min_start: float = 1.6,
-        interval_max_start: float = 2.8,
-        max_enemies_start: int = 6,
-    ):
+    def __init__(self, waves: dict, break_time: float = 4.0):
+        self.waves = waves
         self.break_time = break_time
-        self.fight_time = fight_time
-
-        self.interval_min_start = interval_min_start
-        self.interval_max_start = interval_max_start
-        self.max_enemies_start = max_enemies_start
 
         self.wave = 0
-        self.state = "BREAK"
+        self.state = "BREAK"   # BREAK | FIGHT
         self.timer = 0.0
+
+        self.spawned = 0
+        self.spawn_limit = 0
+
+        # toast
+        self.toast_text = ""
+        self.toast_timer = 0.0
+        self.toast_duration = 1.6
 
     def start(self):
         self.wave = 0
@@ -27,35 +24,65 @@ class WaveSystem:
     def is_fight(self):
         return self.state == "FIGHT"
 
+    def can_spawn(self):
+        return self.is_fight() and (self.spawned < self.spawn_limit)
+
+    def on_spawned(self, n: int = 1):
+        self.spawned += n
+
     def _start_fight(self):
         self.wave += 1
-        self.state = "FIGHT"
-        self.timer = self.fight_time
+        if self.wave not in self.waves:
+            self.wave = max(self.waves.keys())
 
-    def _start_break(self):
+        wcfg = self.waves[self.wave]
+        self.spawned = 0
+        self.spawn_limit = int(wcfg.get("total_spawns", wcfg.get("max_enemies", 4)))
+
+        self.state = "FIGHT"
+
+    def _start_break(self, cleared_wave: int | None = None):
         self.state = "BREAK"
         self.timer = self.break_time
 
+        if cleared_wave is not None:
+            self.toast_text = f"WAVE {cleared_wave} CLEARED!"
+            self.toast_timer = self.toast_duration
+
     def apply_to_spawner(self, spawner):
-        # scaling per wave
-        w = self.wave
+        wcfg = self.waves[self.wave]
+        spawner.set_pool(wcfg["pool"])
+        spawner.set_interval(*wcfg["interval"])
+        spawner.set_max_enemies(wcfg["max_enemies"])
+        spawner.reset()  # ✅ timer herrollen met nieuwe intervals
 
-        # spawn sneller
-        spawner.interval_min = max(0.45, self.interval_min_start - 0.08 * (w - 1))
-        spawner.interval_max = max(0.85, self.interval_max_start - 0.10 * (w - 1))
+    def update(self, dt: float, spawner, enemies: list):
+        # toast timer
+        if self.toast_timer > 0:
+            self.toast_timer = max(0.0, self.toast_timer - dt)
+            if self.toast_timer == 0:
+                self.toast_text = ""
 
-        # meer enemies
-        spawner.max_enemies = self.max_enemies_start + (w - 1)
-
-    def update(self, dt: float, spawner):
-        self.timer -= dt
-
-        if self.timer <= 0:
-            if self.state == "BREAK":
+        if self.state == "BREAK":
+            self.timer -= dt
+            if self.timer <= 0 and len(enemies) == 0:
                 self._start_fight()
-            else:
-                self._start_break()
+                self.apply_to_spawner(spawner)
+            return
 
-        # telkens updaten zodat spawner scaling volgt
-        if self.wave > 0:
-            self.apply_to_spawner(spawner)
+        # FIGHT:
+        # wave is “klaar” als quota gespawned én er zijn geen enemies meer
+        if (self.spawned >= self.spawn_limit) and (len(enemies) == 0):
+            self._start_break(cleared_wave=self.wave)
+
+    def get_toast_alpha(self) -> int:
+        if self.toast_timer <= 0:
+            return 0
+        half = self.toast_duration * 0.25
+        if self.toast_timer > (self.toast_duration - half):
+            t = 1.0 - (self.toast_timer - (self.toast_duration - half)) / half
+        elif self.toast_timer < half:
+            t = self.toast_timer / half
+        else:
+            t = 1.0
+        return max(0, min(255, int(255 * t)))

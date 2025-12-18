@@ -24,6 +24,28 @@ ENEMY_POOL = [
     {"type": "zombie2", "cfg_key": "ZOMBIE2", "weight": 30},
 ]
 
+WAVES = {
+    1: {"pool": [{"type":"zombie","cfg_key":"ZOMBIE","weight":100}],
+        "max_enemies": 4,      #Totaal enemies tegelijk
+        "interval": (1.6, 2.4),
+        "total_spawns": 4,     #totaal in deze wave
+    },
+
+    2: {"pool": [{"type":"zombie","cfg_key":"ZOMBIE","weight":80},
+                 {"type":"zombie2","cfg_key":"ZOMBIE2","weight":20}],
+        "max_enemies": 5,
+        "interval": (1.3, 2.0),
+        "total_spawns": 8,
+    },
+
+    3: {"pool": [{"type":"zombie","cfg_key":"ZOMBIE","weight":60},
+                 {"type":"zombie2","cfg_key":"ZOMBIE2","weight":40}],
+        "max_enemies": 6,
+        "interval": (1.1, 1.7),
+        "total_spawns": 12,
+    },
+}
+
 ZOMBIE = {
     "scale": 3,
     "fps": 10,

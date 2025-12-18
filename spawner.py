@@ -1,17 +1,9 @@
 # spawner.py
 import random
-import pygame
-
 from entities.enemies.registry import get_enemy_class
 
 
 class EnemySpawner:
-    """
-    pool kan:
-    - lijst van dicts: {"type": "zombie", "cfg_key": "ZOMBIE", "weight": 70}
-    - lijst van tuples: ("zombie", "ZOMBIE", 70)
-    """
-
     def __init__(
         self,
         pool,
@@ -26,10 +18,10 @@ class EnemySpawner:
         self.cfg = cfg_module
         self.spawn_y = spawn_y
 
-        self.interval_min = interval_min
-        self.interval_max = interval_max
-        self.max_enemies = max_enemies
-        self.spawn_pad = spawn_pad
+        self.interval_min = float(interval_min)
+        self.interval_max = float(interval_max)
+        self.max_enemies = int(max_enemies)
+        self.spawn_pad = int(spawn_pad)
 
         self.timer = 0.0
         self._reset_timer()
@@ -39,6 +31,7 @@ class EnemySpawner:
         self._reset_timer()
 
     def _reset_timer(self):
+        # safety: als min==max is uniform ook ok
         self.timer = random.uniform(self.interval_min, self.interval_max)
 
     def _normalize_spec(self, item):
@@ -47,6 +40,10 @@ class EnemySpawner:
             etype = item.get("type")
             cfg_key = item.get("cfg_key")
             weight = item.get("weight", 1)
+
+            if not etype or not cfg_key:
+                raise ValueError(f"Enemy spec missing 'type' or 'cfg_key': {item!r}")
+
             return etype, cfg_key, float(weight)
 
         # tuple/list-format: ("zombie","ZOMBIE",70)
@@ -58,9 +55,25 @@ class EnemySpawner:
 
         raise TypeError(f"Invalid enemy spec in pool: {item!r}")
 
+    def set_pool(self, pool):
+        self.pool = pool
+        self._reset_timer()  # ✅ meteen effect
+
+    def set_interval(self, interval_min, interval_max):
+        self.interval_min = float(interval_min)
+        self.interval_max = float(interval_max)
+        self._reset_timer()  # ✅ meteen effect
+
+    def set_max_enemies(self, n):
+        self.max_enemies = int(n)
+
     def _pick_enemy_spec(self):
+        if not self.pool:
+            raise ValueError("EnemySpawner.pool is empty")
+
         specs = [self._normalize_spec(x) for x in self.pool]
         weights = [w for (_, _, w) in specs]
+
         etype, cfg_key, _ = random.choices(specs, weights=weights, k=1)[0]
         return etype, cfg_key
 
@@ -70,11 +83,8 @@ class EnemySpawner:
         EnemyClass = get_enemy_class(etype)
         cfg_dict = getattr(self.cfg, cfg_key)
 
-        # spawn links of rechts buiten beeld
         side = random.choice([-1, 1])
         x = player_x + side * self.spawn_pad
-
-        # clamp binnen world
         x = max(80, min(world_width - 80, x))
 
         return EnemyClass(x, self.spawn_y, cfg_dict)
