@@ -25,8 +25,8 @@ class Player:
         self.max_mana = float(config.get("mana", 50))
         self.mana = float(self.max_mana)
 
-        self.mana_drain_run = 18.0   # mana per seconde tijdens run
-        self.mana_regen = 12.0       # mana per seconde als je NIET runt
+        self.mana_drain_run = 6.0   # mana per seconde tijdens run
+        self.mana_regen = 2.0       # mana per seconde als je NIET runt
 
         self.mana_exhausted = False          # lock sprint until full
         self.mana_draining = False           # UI hint
