@@ -1,11 +1,11 @@
 import pygame
 import config
-import entities.enemies  # IMPORTANT: triggert registry imports
+import entities.enemies  # IMPORTANT: registreert enemy classes
 
 from entities import Player
 from ui_statbar import StatBarUI
 from spawner import EnemySpawner
-
+from wave_system import WaveSystem
 
 pygame.init()
 font = pygame.font.SysFont(None, 36)
@@ -13,9 +13,8 @@ font_big = pygame.font.SysFont(None, 120)
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 
-statui = StatBarUI()
-
 WORLD_WIDTH = 6000
+statui = StatBarUI()
 
 spawner = EnemySpawner(
     pool=config.ENEMY_POOL,
@@ -26,8 +25,12 @@ spawner = EnemySpawner(
     max_enemies=6,
 )
 
+wave_sys = WaveSystem(break_time=4.0, fight_time=18.0)
+wave_sys.start()
+
 def reset_game():
     spawner.reset()
+    wave_sys.start()
     player = Player(640, 680, config.PLAYER)
     projectiles = []
     enemies = []
@@ -47,17 +50,21 @@ while running:
 
     keys = pygame.key.get_pressed()
 
+    # wave update (past spawner settings aan)
+    wave_sys.update(dt, spawner)
+
     if not player.dead:
         player.update(keys, dt, projectiles, config.PROJECTILES)
 
-        # spawn enemies
-        spawner.update(dt, player, enemies, world_width=WORLD_WIDTH)
+        # spawn alleen tijdens fight
+        if wave_sys.is_fight():
+            spawner.update(dt, player, enemies, world_width=WORLD_WIDTH)
 
-        # enemies update
+        # enemies
         for e in enemies:
             e.update(dt, player)
 
-        # projectiles update
+        # projectiles
         for p in projectiles:
             p.update(dt)
 
@@ -68,12 +75,10 @@ while running:
                     e.take_damage(config.DAMAGE["book"])
                     p.age = p.lifetime
 
-        # cleanup
         projectiles = [p for p in projectiles if not p.is_dead()]
         enemies = [e for e in enemies if not getattr(e, "remove", False)]
 
     else:
-        # keep death anims updating
         player.update(keys, dt, projectiles, config.PROJECTILES)
 
     # UI
@@ -90,6 +95,10 @@ while running:
 
     # DRAW
     screen.fill((20, 20, 20))
+
+    wave_text = font.render(f"WAVE {wave_sys.wave} - {wave_sys.state}", True, (255, 255, 255))
+    screen.blit(wave_text, (20, 20))
+
     statui.draw(screen)
     player.draw(screen)
 
@@ -103,9 +112,7 @@ while running:
         text = font_big.render("YOU DIED", True, (255, 255, 255))
         rect = text.get_rect(center=(1280 // 2, 120))
         screen.blit(text, rect)
-
-        tip = font.render("Press R to respawn", True, (255, 255, 255))
-        screen.blit(tip, (20, 60))
+        # (geen respawn tip meer)
 
     pygame.display.flip()
 

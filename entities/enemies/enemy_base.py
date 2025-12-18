@@ -1,38 +1,35 @@
+# entities/enemies/enemy_base.py
 import pygame
 from animation import SpriteSheet, Animator
 
 
 class EnemyBase:
     """
-    Universele basis voor enemies:
-    - anim loading uit config["anims"]
-    - hp/dead/remove
-    - death linger + fade-out
-    - rect/pos handling
+    Basisklasse voor alle enemies.
+    Subclasses implementeren alleen: update_alive(dt, player)
     """
 
     def __init__(self, x: int, y: int, config: dict):
         self.cfg = config
 
-        # facing & stats
         self.facing_right = False
-        self.speed = config.get("speed", 120)
-        self.max_hp = config.get("hp", 5)
-        self.hp = self.max_hp
+        self.speed = float(config.get("speed", 120))
+        self.hp = int(config.get("hp", 5))
 
         # life state
         self.dead = False
         self.remove = False
 
-        # death linger + fade
+        # death timing
         self.death_linger = float(config.get("death_linger", 1.2))
         self.death_timer = 0.0
-        self.fade_time = float(config.get("death_fade_time", 0.6))
-        self.alpha = 255
+
+        # optional stun (parry etc)
+        self.stun_timer = 0.0
 
         # animations
-        scale = config.get("scale", 2)
-        fps = config.get("fps", 10)
+        scale = int(config.get("scale", 2))
+        fps = int(config.get("fps", 10))
 
         animations = {}
         for name, a in config["anims"].items():
@@ -43,7 +40,11 @@ class EnemyBase:
 
             right = sheet.slice_row(0, frames, fw, fh, scale)
             left = [pygame.transform.flip(f, True, False) for f in right]
-            animations[name] = {"right": right, "left": left, "loop": a.get("loop", True)}
+            animations[name] = {
+                "right": right,
+                "left": left,
+                "loop": a.get("loop", True),
+            }
 
         self.anim = Animator(animations, default="idle", fps=fps)
 
@@ -54,8 +55,16 @@ class EnemyBase:
         self.pos = pygame.Vector2(self.rect.midbottom)
 
     # -------------------------
-    # DAMAGE / DEATH
+    # COMMON HELPERS
     # -------------------------
+    def stun(self, duration: float = 0.6):
+        """Stop beweging/attack tijdelijk."""
+        self.stun_timer = max(self.stun_timer, float(duration))
+        if "stun" in self.anim.animations:
+            self.anim.play("stun", reset_if_same=True)
+        elif "hurt" in self.anim.animations:
+            self.anim.play("hurt", reset_if_same=True)
+
     def take_damage(self, amount: int):
         if self.dead:
             return
@@ -63,48 +72,42 @@ class EnemyBase:
         self.hp -= int(amount)
         if self.hp <= 0:
             self.hp = 0
-            self.die()
+            self.dead = True
+            self.death_timer = self.death_linger
+            if "dead" in self.anim.animations:
+                self.anim.play("dead", reset_if_same=True)
             return
 
         if "hurt" in self.anim.animations:
             self.anim.play("hurt", reset_if_same=True)
 
-    def die(self):
-        if self.dead:
-            return
-        self.dead = True
-        self.death_timer = self.death_linger
-        if "dead" in self.anim.animations:
-            self.anim.play("dead", reset_if_same=True)
-
     # -------------------------
     # UPDATE
     # -------------------------
     def update(self, dt: float, player):
-        # base death handling
+        # death
         if self.dead:
             self.anim.update(dt)
-
             self.death_timer -= dt
             if self.death_timer <= 0:
-                # start fade-out
-                if self.fade_time <= 0:
-                    self.remove = True
-                else:
-                    self.alpha -= int(255 * (dt / self.fade_time))
-                    if self.alpha <= 0:
-                        self.alpha = 0
-                        self.remove = True
-
+                self.remove = True
             self.rect.midbottom = self.pos
             return
 
-        # subclass should implement alive behavior
+        # stun
+        if self.stun_timer > 0:
+            self.stun_timer = max(0.0, self.stun_timer - dt)
+            self.anim.update(dt)
+            self.rect.midbottom = self.pos
+            return
+
+        # alive behaviour
         self.update_alive(dt, player)
         self.rect.midbottom = self.pos
 
     def update_alive(self, dt: float, player):
-        """Override in subclass."""
+        """Subclasses override."""
+        self.anim.play("idle")
         self.anim.update(dt)
 
     # -------------------------
@@ -112,10 +115,4 @@ class EnemyBase:
     # -------------------------
     def draw(self, screen: pygame.Surface):
         img = self.anim.get_image(self.facing_right)
-
-        # fade when dead
-        if self.dead and self.alpha < 255:
-            img = img.copy()
-            img.set_alpha(self.alpha)
-
         screen.blit(img, self.rect)
