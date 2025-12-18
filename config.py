@@ -15,7 +15,7 @@ PLAYER = {
         "protect": {"sheet": "assets/Schoolgirl/Protection.png", "frames": 4,  "loop": False},
         "dead":    {"sheet": "assets/Schoolgirl/Death.png",      "frames": 5,  "loop": False},
         "hurt":    {"sheet": "assets/Schoolgirl/Hurt.png",       "frames": 3, "loop": True},
-        "jump":    {"sheet": "assets/Schoolgirl/Jump.png",       "frames": 15, "loop": True},
+        "jump":    {"sheet": "assets/Schoolgirl/Jump.png",       "frames": 15, "loop": False},
     }
 }
 

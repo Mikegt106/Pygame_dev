@@ -1,6 +1,6 @@
 import pygame
 from entities import Player
-from enemies import Zombie
+from entities.enemies import Zombie
 from config import PLAYER, PROJECTILES, ZOMBIE, DAMAGE
 from ui_statbar import StatBarUI
 from spawner import EnemySpawner
