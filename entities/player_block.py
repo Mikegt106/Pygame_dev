@@ -2,13 +2,14 @@
 import math
 import random
 import pygame
+from enum import Enum, auto
 from assets import load_image
 
 
-class BlockResult:
-    NONE = 0
-    SUCCESS = 1
-    FAIL = 2
+class BlockResult(Enum):
+    NONE = auto()      # niet aan het blocken / geen roll
+    SUCCESS = auto()   # perfect block (parry)
+    FAIL = auto()      # block geprobeerd maar faalde
 
 
 class BlockSystem:
@@ -18,15 +19,15 @@ class BlockSystem:
         shield_scale=0.1,
         block_chance=0.60,
         fail_stun=0.40,
-        cooldown=0.5,
-        pushback_force=350.0,   # ✅ TUNE: hoe hard je terugduwt bij success
+        cooldown=1.0,
+        pushback_force=300.0,
     ):
         self.blocking = False
 
         self.block_chance = block_chance
         self.fail_stun = fail_stun
 
-        self.cooldown_duration = float(cooldown)
+        self.cooldown_duration = cooldown
         self.cooldown_timer = 0.0
 
         self.pushback_force = float(pushback_force)
@@ -53,7 +54,6 @@ class BlockSystem:
         # alleen blocken als geen cooldown
         self.blocking = protecting_key and (self.cooldown_timer <= 0)
 
-        # timers
         if self.shield_timer > 0:
             self.shield_timer = max(0.0, self.shield_timer - dt)
         if self.fail_fx_timer > 0:
@@ -61,30 +61,21 @@ class BlockSystem:
         if self.hit_pop_timer > 0:
             self.hit_pop_timer = max(0.0, self.hit_pop_timer - dt)
 
-    def try_block(self):
-        """
-        Call ONLY when enemy actually hits.
-        Returns (BlockResult, pushback_force)
-        """
+    def try_block(self) -> BlockResult:
+        """Call ONLY when enemy actually hits."""
         if not self.blocking:
-            return BlockResult.NONE, 0.0
+            return BlockResult.NONE
 
         if random.random() <= self.block_chance:
-            # ✅ SUCCESS
             self.shield_timer = self.shield_duration
             self.hit_pop_timer = self.hit_pop_duration
-            return BlockResult.SUCCESS, self.pushback_force
+            return BlockResult.SUCCESS
 
-        # ❌ FAIL
         self.fail_fx_timer = self.fail_fx_duration
         self.cooldown_timer = self.cooldown_duration
-        return BlockResult.FAIL, 0.0
-
-    def get_fail_stun(self) -> float:
-        return self.fail_stun
+        return BlockResult.FAIL
 
     def draw_shield(self, screen: pygame.Surface, player_rect: pygame.Rect, facing_right: bool):
-        # alleen tekenen wanneer hit gebeurd is (success of fail)
         if self.shield_timer <= 0 and self.fail_fx_timer <= 0:
             return
 
@@ -93,16 +84,12 @@ class BlockSystem:
         add = int(90 * pulse)
 
         if self.fail_fx_timer > 0:
-            # red pulse
             s.fill((add + 60, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
         else:
-            # green/white pulse
             s.fill((0, add + 30, 0), special_flags=pygame.BLEND_RGB_ADD)
             s.fill((add, add, add), special_flags=pygame.BLEND_RGB_ADD)
 
         direction = 1 if facing_right else -1
         shield_x = player_rect.centerx + direction * 35
         shield_y = player_rect.centery - 20
-
-        sr = s.get_rect(center=(shield_x, shield_y))
-        screen.blit(s, sr)
+        screen.blit(s, s.get_rect(center=(shield_x, shield_y)))

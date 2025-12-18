@@ -40,6 +40,7 @@ ZOMBIE = {
     "attack_range": 90,        # pixels (tweak)
     "attack_cooldown": 1.0,    # seconden tussen aanvallen
     "attack_hit_time": 0.25,   # wanneer hit gebeurt tijdens attack anim (sec)
+    "stun_duration": 0.35,
 
     "anims": {
         "idle":   {"sheet": "assets/Zombie/Idle.png",   "frames": 6,  "loop": True},
