@@ -1,7 +1,10 @@
 import pygame
+import math
+import random
 from animation import SpriteSheet, Animator
 from movement import Movement
 from projectiles import BookProjectile
+from assets import load_image
 
 
 class Player:
@@ -25,12 +28,12 @@ class Player:
         self.max_mana = float(config.get("mana", 50))
         self.mana = float(self.max_mana)
 
-        self.mana_drain_run = 6.0   # mana per seconde tijdens run
-        self.mana_regen = 2.0       # mana per seconde als je NIET runt
+        self.mana_drain_run = 6.0
+        self.mana_regen = 2.0
 
-        self.mana_exhausted = False          # lock sprint until full
-        self.mana_draining = False           # UI hint
-        self.mana_regening = False           # UI hint
+        self.mana_exhausted = False
+        self.mana_draining = False
+        self.mana_regening = False
 
         # damage feedback
         self.damage_timer = 0.0
@@ -45,8 +48,35 @@ class Player:
         self.hurt_timer = 0.0
         self.hurt_duration = 0.25
 
-        # blocking flag (betrouwbaar voor damage)
+        # blocking
         self.blocking = False
+
+        # --- BLOCK/SHIELD FX ---
+        self.shield_img = load_image("assets/HealthbarUI/Blockshield.png", alpha=True, scale=0.1)
+
+        self.shield_timer = 0.0
+        self.shield_duration = 0.18   # success flash duration
+
+        self.block_fail_timer = 0.0
+        self.block_fail_duration = 0.22
+
+        self.block_chance = 0.60       # 60% chance to succeed
+        self.block_fail_stun = 0.40    # extra stun if fail
+        
+        # --- BLOCK COOLDOWN ---
+        self.block_cooldown_timer = 0.0
+        self.block_cooldown_duration = 1
+
+        # optional tiny “pop” flash on block success
+        self.block_hit_timer = 0.0
+        self.block_hit_duration = 0.10
+
+        # flags (optional for UI/logging)
+        self.block_good = False
+        self.block_fail = False
+
+        # fx time
+        self._t = 0.0
 
         # config
         scale = config.get("scale", 2)
@@ -72,11 +102,7 @@ class Player:
             )
             left = [pygame.transform.flip(f, True, False) for f in right]
 
-            animations[name] = {
-                "right": right,
-                "left": left,
-                "loop": a.get("loop", True)
-            }
+            animations[name] = {"right": right, "left": left, "loop": a.get("loop", True)}
 
         self.anim = Animator(animations, default="idle", fps=fps)
 
@@ -98,41 +124,53 @@ class Player:
         self.jump_strength = 950.0
         self.on_ground = True
 
-        # jump anim sync (progress-based)
         self.jump_t = 0.0
         self.jump_total = (2 * self.jump_strength) / self.gravity
 
-        # fixed ground (for now)
         self.ground_y = y
 
         # state
         self.dead = False
-        self.dead_vel_x = 0.0  # forward drift after death
+        self.dead_vel_x = 0.0
 
     def update(self, keys, dt: float, projectiles: list, projectile_cfg: dict):
+        self._t += dt
+
+        # reset flags per frame
+        self.block_good = False
+        self.block_fail = False
+
+        # timers
+        if self.damage_timer > 0:
+            self.damage_timer = max(0.0, self.damage_timer - dt)
+        if self.block_hit_timer > 0:
+            self.block_hit_timer = max(0.0, self.block_hit_timer - dt)
+        if self.shield_timer > 0:
+            self.shield_timer = max(0.0, self.shield_timer - dt)
+        if self.block_fail_timer > 0:
+            self.block_fail_timer = max(0.0, self.block_fail_timer - dt)
+        if self.block_cooldown_timer > 0:
+            self.block_cooldown_timer = max(0.0, self.block_cooldown_timer - dt)
+
         # ----- inputs -----
         mouse_buttons = pygame.mouse.get_pressed()
         attack_now = keys[pygame.K_RETURN] or mouse_buttons[0]
         attack_pressed = attack_now and not self.attack_key_prev
         self.attack_key_prev = attack_now
 
-        protecting = keys[pygame.K_e]
-        self.blocking = protecting  # ✅ betrouwbare flag
+        protecting = keys[pygame.K_e] and self.block_cooldown_timer <= 0
+        self.blocking = protecting
 
-        # --- Jump input (just pressed) ---
         jump_now = keys[pygame.K_SPACE]
         jump_pressed = jump_now and not self.jump_key_prev
         self.jump_key_prev = jump_now
 
-        # ----- timers -----
+        # timers: slow
         if self.slow_timer > 0:
             self.slow_timer = max(0.0, self.slow_timer - dt)
             speed_mult = self.slow_multiplier
         else:
             speed_mult = 1.0
-
-        if self.damage_timer > 0:
-            self.damage_timer = max(0.0, self.damage_timer - dt)
 
         # ---- START JUMP ----
         if jump_pressed and self.on_ground and (self.anim.state != "attack") and (not protecting) and (not self.dead):
@@ -154,7 +192,6 @@ class Player:
         else:
             self.on_ground = False
 
-        # horizontal drift while dead
         if self.dead:
             self.pos.x += self.dead_vel_x * dt
             if self.on_ground:
@@ -186,21 +223,15 @@ class Player:
 
         if can_move:
             air_mult = 1.6 if not self.on_ground else 1.0
-
             want_sprint = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
 
-            # ✅ exhaustion lock logic:
-            # - als mana 0 -> exhausted True
-            # - pas resetten als mana terug VOL is
             if self.mana <= 0:
                 self.mana = 0
                 self.mana_exhausted = True
-
             if self.mana_exhausted and self.mana >= self.max_mana:
                 self.mana = self.max_mana
                 self.mana_exhausted = False
 
-            # sprint allowed?
             sprinting = want_sprint and (not self.mana_exhausted) and (self.mana > 0)
 
             moving, facing_right, sprinting = self.movement.update_horizontal(
@@ -210,16 +241,14 @@ class Player:
             if moving:
                 self.facing_right = facing_right
 
-            # ----- MANA DRAIN/REGEN -----
+            # mana drain/regen
             if sprinting and moving and (not self.mana_exhausted):
                 self.mana_draining = True
                 self.mana -= self.mana_drain_run * dt
-
                 if self.mana <= 0:
                     self.mana = 0
                     self.mana_exhausted = True
             else:
-                # regen alleen als je NIET sprint
                 if self.mana < self.max_mana:
                     self.mana_regening = True
                     self.mana += self.mana_regen * dt
@@ -233,7 +262,6 @@ class Player:
             progress = max(0.0, min(1.0, progress))
 
             self.anim.play("jump")
-
             frames = self.anim.animations["jump"]["right"]
             n = len(frames)
 
@@ -255,10 +283,7 @@ class Player:
                 direction = 1 if self.facing_right else -1
                 spawn_x = self.rect.centerx + (30 * direction)
                 spawn_y = self.rect.centery + 50
-
-                projectiles.append(
-                    BookProjectile(spawn_x, spawn_y, direction, projectile_cfg["book"])
-                )
+                projectiles.append(BookProjectile(spawn_x, spawn_y, direction, projectile_cfg["book"]))
                 self.attack_spawned = True
 
             if self.anim.finished:
@@ -274,10 +299,7 @@ class Player:
                 self.anim.play("protect")
 
             elif moving:
-                if sprinting and ("run" in self.anim.animations):
-                    self.anim.play("run")
-                else:
-                    self.anim.play("walk")
+                self.anim.play("run" if (sprinting and ("run" in self.anim.animations)) else "walk")
                 self.anim.update(dt)
 
             else:
@@ -290,10 +312,37 @@ class Player:
         if self.dead:
             return
 
-        # ✅ block = no damage (of kies 0.3 voor chip damage)
+        # --- BLOCK LOGIC ---
         if self.blocking:
+            if random.random() <= self.block_chance:
+                # ✅ SUCCESSFUL BLOCK
+                self.block_good = True
+
+                # shield FX
+                self.shield_timer = self.shield_duration
+                self.block_hit_timer = self.block_hit_duration
+
+                # kleine pushback (optioneel)
+                direction = 1 if self.facing_right else -1
+                self.pos.x -= direction * 6
+
+                # ❗ BELANGRIJK:
+                # geen damage, geen hurt, anim blijft "protect"
+                return
+            else:
+                # ❌ FAILED BLOCK
+                self.block_fail = True
+                self.block_fail_timer = self.block_fail_duration
+
+                # stun
+                self.hurt_timer = max(self.hurt_timer, self.block_fail_stun)
+
+                # ⛔ block cooldown
+                self.block_cooldown_timer = self.block_cooldown_duration
+
+        # --- DAMAGE (normaal of failed block) ---
+        if amount <= 0:
             return
-            # of: amount = int(amount * 0.3)
 
         self.hp -= amount
         if self.hp < 0:
@@ -301,21 +350,47 @@ class Player:
 
         self.damage_timer = self.damage_flash_duration
         self.slow_timer = self.slow_duration
-        self.hurt_timer = self.hurt_duration
+        self.hurt_timer = max(self.hurt_timer, self.hurt_duration)
 
         if self.hp == 0:
             self.dead = True
             self.anim.play("dead", reset_if_same=True)
-
             direction = 1 if self.facing_right else -1
             self.dead_vel_x = direction * 260.0
 
     def draw(self, screen: pygame.Surface):
         img = self.anim.get_image(self.facing_right)
 
+        # base sprite with damage/block pop
         if self.damage_timer > 0:
             flash = img.copy()
             flash.fill((255, 0, 0), special_flags=pygame.BLEND_RGBA_MULT)
             screen.blit(flash, self.rect)
+        elif self.block_hit_timer > 0:
+            fx = img.copy()
+            fx.fill((255, 255, 255), special_flags=pygame.BLEND_RGB_ADD)
+            screen.blit(fx, self.rect)
         else:
             screen.blit(img, self.rect)
+
+        # --- SHIELD overlay (ONLY on hit) ---
+        if self.shield_timer > 0 or self.block_fail_timer > 0:
+            s = self.shield_img.copy()
+
+            pulse = (math.sin(self._t * 14.0) + 1.0) * 0.5
+            add = int(90 * pulse)
+
+            if self.block_fail_timer > 0:
+                # ❌ FAILED block → red pulse
+                s.fill((add + 60, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
+            else:
+                # ✅ SUCCESS block → green/white pulse
+                s.fill((0, add + 30, 0), special_flags=pygame.BLEND_RGB_ADD)
+                s.fill((add, add, add), special_flags=pygame.BLEND_RGB_ADD)
+
+            direction = 1 if self.facing_right else -1
+            shield_x = self.rect.centerx + direction * 35
+            shield_y = self.rect.centery - 20
+
+            sr = s.get_rect(center=(shield_x, shield_y))
+            screen.blit(s, sr)
