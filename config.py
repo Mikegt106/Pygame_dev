@@ -9,8 +9,12 @@ PLAYER = {
     "anims": {
         "idle":    {"sheet": "assets/Schoolgirl/Idle.png",       "frames": 9,  "loop": True},
         "walk":    {"sheet": "assets/Schoolgirl/Walk.png",       "frames": 12, "loop": True},
+        "run":      {"sheet": "assets/Schoolgirl/Run.png",       "frames": 12, "loop": True},
         "attack":  {"sheet": "assets/Schoolgirl/Attack.png",     "frames": 8,  "loop": False},
         "protect": {"sheet": "assets/Schoolgirl/Protection.png", "frames": 4,  "loop": False},
+        "dead":    {"sheet": "assets/Schoolgirl/Death.png",      "frames": 5,  "loop": False},
+        "hurt":    {"sheet": "assets/Schoolgirl/Hurt.png",       "frames": 3, "loop": True},
+        "jump":    {"sheet": "assets/Schoolgirl/Jump.png",       "frames": 15, "loop": True},
     }
 }
 
