@@ -2,12 +2,16 @@ import pygame
 from entities import Player
 from enemies import Zombie
 from config import PLAYER, PROJECTILES, ZOMBIE, DAMAGE
+from ui_statbar import StatBarUI
 
 pygame.init()
 font = pygame.font.SysFont(None, 36)
 font_big = pygame.font.SysFont(None, 120)
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
+
+# ✅ maak UI pas na pygame.init()
+statui = StatBarUI()
 
 def reset_game():
     player = Player(640, 680, PLAYER)
@@ -25,13 +29,11 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-        # respawn
         if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
             player, projectiles, zombies = reset_game()
 
     keys = pygame.key.get_pressed()
 
-    # Alleen gameplay updates als je niet dood bent
     if not player.dead:
         player.update(keys, dt, projectiles, PROJECTILES)
 
@@ -41,7 +43,6 @@ while running:
         for z in zombies:
             z.update(dt, player)
 
-        # projectile -> zombie hit
         for p in projectiles:
             for z in zombies:
                 if p.rect.colliderect(z.rect) and not z.dead:
@@ -50,19 +51,19 @@ while running:
 
         projectiles = [p for p in projectiles if not p.is_dead()]
     else:
-        # laat death anim nog doorlopen (als je die in player.update doet)
         player.update(keys, dt, projectiles, PROJECTILES)
+
+    # ✅ update bar values (mana later uit player)
+    statui.set_values(player.hp, 50, max_hp=PLAYER.get("hp", 10), max_mana=50)
 
     # draw
     screen.fill((20, 20, 20))
+    statui.draw(screen)
     player.draw(screen)
     for z in zombies:
         z.draw(screen)
     for p in projectiles:
         p.draw(screen)
-
-    hp_text = font.render(f"HP: {player.hp}", True, (255, 255, 255))
-    screen.blit(hp_text, (20, 20))
 
     if player.dead:
         text = font_big.render("YOU DIED", True, (255, 255, 255))
