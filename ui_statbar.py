@@ -8,11 +8,12 @@ class StatBarUI:
 
         # load + scale once (via cached loader)
         self.panel    = load_image("assets/HealthbarUI/HealthBarPanel_160x41.png", alpha=True, scale=scale)
-        self.circle   = load_image("assets/HealthbarUI/BlackBigCircleBoxWithBorder_27x27.png", alpha=True, scale=scale*1.2)
+        self.circle   = load_image("assets/HealthbarUI/BlackBigCircleBoxWithBorder_27x27.png", alpha=True, scale=scale)
         self.valuebar = load_image("assets/HealthbarUI/ValueBar_128x16.png", alpha=True, scale=scale)
         self.red      = load_image("assets/HealthbarUI/ValueRed_120x8.png", alpha=True, scale=scale)
         self.blue     = load_image("assets/HealthbarUI/ValueBlue_120x8.png", alpha=True, scale=scale)
         self.knot     = load_image("assets/HealthbarUI/CornerKnot_14x14.png", alpha=True, scale=scale)
+        self.heart    = load_image("assets/HealthbarUI/Heart.png", alpha=True, scale=scale*1.2)
 
         # ✅ mana container = dezelfde valuebar maar dunner in HEIGHT (breedte blijft identiek)
         vb_w = self.valuebar.get_width()
@@ -33,13 +34,14 @@ class StatBarUI:
 
         self.circle_nudge      = pygame.Vector2(-10, -4) * scale
 
-        self.hp_bar_nudge      = pygame.Vector2(-8, 0) * scale
-        self.mana_bar_nudge    = pygame.Vector2(-10, -0.4) * scale
+        self.hp_bar_nudge      = pygame.Vector2(-13, -1.2) * scale
+        self.mana_bar_nudge    = pygame.Vector2(-15, -1.6) * scale
 
         self.hp_fill_nudge     = pygame.Vector2(0, 0) * scale
         self.mana_fill_nudge   = pygame.Vector2(0, -2) * scale
 
         self.knots_nudge       = pygame.Vector2(0,0) * scale
+        self.heart_nudge = pygame.Vector2(0, 0) * scale 
 
         # ✅ spacing: gebaseerd op mana bar hoogte (netjes onder elkaar)
         self.valuebar_spacing = (vb_h - int(vb_h * 0.7)) + (10 * scale)  # klein gat
@@ -75,16 +77,16 @@ class StatBarUI:
         base = self.pos + self.panel_offset
         x, y = int(base.x), int(base.y)
 
-        # panel
+        """# panel
         screen.blit(self.panel, (x, y))
-        pr = self.panel.get_rect(topleft=(x, y))
+        pr = self.panel.get_rect(topleft=(x, y))"""
 
-        # knots
+        """# knots
         k = self.knot
         ki = self.knot_inset
         kn = self.knots_nudge
         screen.blit(k, (pr.right - k.get_width() + 5 - ki.x, pr.top + ki.y -5))     #top right
-        screen.blit(k, (pr.right - k.get_width() - ki.x +5, pr.bottom - k.get_height() - ki.y +5))    #bottom right
+        screen.blit(k, (pr.right - k.get_width() - ki.x +5, pr.bottom - k.get_height() - ki.y +5))    #bottom right"""
 
         # positions
         vb1_pos = (x + int(self.valuebar_offset.x + self.hp_bar_nudge.x),
@@ -113,3 +115,12 @@ class StatBarUI:
         cpos = (x + int(self.circle_offset.x + self.circle_nudge.x),
             y + int(self.circle_offset.y + self.circle_nudge.y))
         screen.blit(self.circle, cpos)
+        
+        # heart (center in circle)
+        circle_rect = self.circle.get_rect(topleft=cpos)
+        heart_rect = self.heart.get_rect(center=circle_rect.center)
+
+        heart_rect.x += int(self.heart_nudge.x)
+        heart_rect.y += int(self.heart_nudge.y)
+
+        screen.blit(self.heart, heart_rect)
