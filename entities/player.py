@@ -11,6 +11,7 @@ from entities.player_mana import ManaSystem
 class Player:
     def __init__(self, x: int, y: int, config: dict):
         self.facing_right = True
+        self.coins = 0
 
         # input
         self.attack_key_prev = False

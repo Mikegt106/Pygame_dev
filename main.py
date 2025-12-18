@@ -7,17 +7,21 @@ from entities import Player
 from ui_statbar import StatBarUI
 from spawner import EnemySpawner
 from wave_system import WaveSystem
-
+from loot_system import LootSystem
 
 pygame.init()
+
 font = pygame.font.SysFont(None, 36)
 font_big = pygame.font.SysFont(None, 96)
-font_small = pygame.font.SysFont(None, 24) 
+font_small = pygame.font.SysFont(None, 24)
+
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 
 WORLD_WIDTH = 6000
+
 statui = StatBarUI()
+loot_sys = LootSystem(coins_min=0, coins_max=4)
 
 # --------------------------------------------------
 # SPAWNER (wordt per wave aangepast)
@@ -40,20 +44,20 @@ wave_sys = WaveSystem(
 )
 wave_sys.start()
 
-
 # --------------------------------------------------
 # RESET
 # --------------------------------------------------
 def reset_game():
     spawner.reset()
     wave_sys.start()
+
     player = Player(640, 680, config.PLAYER)
     projectiles = []
     enemies = []
-    return player, projectiles, enemies
+    pickups = []
+    return player, projectiles, enemies, pickups
 
-
-player, projectiles, enemies = reset_game()
+player, projectiles, enemies, pickups = reset_game()
 
 running = True
 while running:
@@ -67,7 +71,7 @@ while running:
             running = False
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-            player, projectiles, enemies = reset_game()
+            player, projectiles, enemies, pickups = reset_game()  # ✅ pickups ook resetten
 
     keys = pygame.key.get_pressed()
 
@@ -104,7 +108,20 @@ while running:
         p.update(dt)
 
     # --------------------------------------------------
-    # COLLISIONS
+    # PICKUPS UPDATE  ✅
+    # --------------------------------------------------
+    for c in pickups:
+        c.update(dt)
+
+        if player.rect.colliderect(c.rect):
+            player.coins = getattr(player, "coins", 0) + getattr(c, "amount", 1)
+            if hasattr(c, "collect"):
+                c.collect()
+            else:
+                c.dead = True
+
+    # --------------------------------------------------
+    # COLLISIONS (projectiles -> enemies)
     # --------------------------------------------------
     for p in projectiles:
         for e in enemies:
@@ -113,10 +130,18 @@ while running:
                 p.age = p.lifetime
 
     # --------------------------------------------------
-    # CLEANUP
+    # LOOT DROPS (enemy net gestorven) ✅
+    # --------------------------------------------------
+    for e in enemies:
+        if getattr(e, "dead", False) and not getattr(e, "_loot_dropped", False):
+            loot_sys.on_enemy_death(e, pickups)
+
+    # --------------------------------------------------
+    # CLEANUP ✅
     # --------------------------------------------------
     projectiles = [p for p in projectiles if not p.is_dead()]
     enemies = [e for e in enemies if not getattr(e, "remove", False)]
+    pickups = [c for c in pickups if not getattr(c, "dead", False) and not getattr(c, "remove", False)]
 
     # --------------------------------------------------
     # UI UPDATE
@@ -155,7 +180,7 @@ while running:
         True,
         (255, 255, 255),
     )
-    screen.blit(left_text,(100, 80))
+    screen.blit(left_text, (100, 80))
 
     # --- Wave cleared toast ---
     if wave_sys.toast_text:
@@ -173,6 +198,13 @@ while running:
 
     for p in projectiles:
         p.draw(screen)
+
+    # pickups tekenen
+    for c in pickups:
+        c.draw(screen)
+                
+    coin_text = font_small.render(f"COINS: {getattr(player, 'coins', 0)}", True, (255, 255, 0))
+    screen.blit(coin_text, (100, 105))
 
     if player.dead:
         text = font_big.render("YOU DIED", True, (255, 255, 255))
