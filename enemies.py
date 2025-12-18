@@ -1,0 +1,127 @@
+import pygame
+from animation import SpriteSheet, Animator
+
+class Zombie:
+    def __init__(self, x: int, y: int, config: dict):
+        self.facing_right = False
+        self.speed = config.get("speed", 120)
+        self.hp = config.get("hp", 5)
+        self.dead = False
+
+        self.attack_damage = config.get("attack_damage", 1)
+        self.attack_range = config.get("attack_range", 90)
+        self.attack_cooldown = config.get("attack_cooldown", 1.0)
+        self.attack_hit_time = config.get("attack_hit_time", 0.25)
+
+        self.cooldown_timer = 0.0
+        self.attack_timer = 0.0
+        self.attack_hit_done = False
+
+        scale = config.get("scale", 2)
+        fps = config.get("fps", 10)
+
+        animations = {}
+        for name, a in config["anims"].items():
+            sheet = SpriteSheet(a["sheet"])
+            frames = a["frames"]
+
+            sheet_w = sheet.sheet.get_width()
+            sheet_h = sheet.sheet.get_height()
+            frame_w = sheet_w // frames
+            frame_h = sheet_h
+
+            right = sheet.slice_row(0, frames, frame_w, frame_h, scale)
+            left  = [pygame.transform.flip(f, True, False) for f in right]
+            animations[name] = {"right": right, "left": left, "loop": a.get("loop", True)}
+
+        self.anim = Animator(animations, default="idle", fps=fps)
+
+        self.image = self.anim.get_image(self.facing_right)
+        self.rect = self.image.get_rect()
+        self.rect.midbottom = (x, y)
+        self.pos = pygame.Vector2(self.rect.midbottom)
+
+    def take_damage(self, amount: int):
+        if self.dead:
+            return
+
+        self.hp -= amount
+        if self.hp <= 0:
+            self.dead = True
+            self.anim.play("dead", reset_if_same=True)
+        else:
+            if "hurt" in self.anim.animations:
+                self.anim.play("hurt", reset_if_same=True)
+
+    def start_attack(self):
+        self.anim.play("attack", reset_if_same=True)
+        self.attack_timer = 0.0
+        self.attack_hit_done = False
+        self.cooldown_timer = self.attack_cooldown
+
+    def update(self, dt: float, player):
+        # timers
+        if self.cooldown_timer > 0:
+            self.cooldown_timer -= dt
+
+        # death anim
+        if self.dead:
+            self.anim.update(dt)
+            return
+
+        # hurt one-shot blocks movement/attack
+        if self.anim.state == "hurt":
+            self.anim.update(dt)
+            if self.anim.finished:
+                self.anim.play("idle")
+            self.rect.midbottom = self.pos
+            return
+
+        # if attacking: run attack, deal damage once at hit time
+        if self.anim.state == "attack":
+            self.anim.update(dt)
+            self.attack_timer += dt
+
+            # hit moment
+            if (not self.attack_hit_done) and (self.attack_timer >= self.attack_hit_time):
+                # only damage if still in range
+                if abs(player.rect.centerx - self.rect.centerx) <= self.attack_range:
+                    player.take_damage(self.attack_damage)
+                self.attack_hit_done = True
+
+            # end attack
+            if self.anim.finished:
+                self.anim.play("idle")
+
+            self.rect.midbottom = self.pos
+            return
+
+        # normal AI: chase until in range, then attack
+        dx = player.rect.centerx - self.rect.centerx
+        dist = abs(dx)
+
+        if dist <= self.attack_range and self.cooldown_timer <= 0:
+            # face player and attack
+            self.facing_right = (dx > 0)
+            self.start_attack()
+            self.rect.midbottom = self.pos
+            return
+
+        # else: walk towards player
+        if dist < 5:
+            self.anim.play("idle")
+            self.anim.update(dt)
+        else:
+            direction = 1 if dx > 0 else -1
+            self.facing_right = (direction == 1)
+
+            self.pos.x += self.speed * direction * dt
+            self.anim.play("walk")
+            self.anim.update(dt)
+
+        self.rect.midbottom = self.pos
+
+    def draw(self, screen: pygame.Surface):
+        img = self.anim.get_image(self.facing_right)
+        screen.blit(img, self.rect)
+        
