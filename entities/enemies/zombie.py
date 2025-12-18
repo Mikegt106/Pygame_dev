@@ -19,7 +19,7 @@ class Zombie(EnemyBase):
         self.attack_hit_done = False
 
         # --- STUN (parry) ---
-        self.stun_timer = 0.0
+        # ❗ NIET: self.stun_timer = 0.0 (zit al in EnemyBase)
         self.stun_duration = float(config.get("stun_duration", 0.70))
         self.stun_anim_speed = float(config.get("stun_anim_speed", 0.20))
 
@@ -31,7 +31,9 @@ class Zombie(EnemyBase):
     # -------------------------
     def stun(self, duration: float | None = None):
         dur = self.stun_duration if duration is None else float(duration)
-        self.stun_timer = max(self.stun_timer, dur)
+
+        # ✅ gebruik de base stun_timer + (optioneel) base anim
+        super().stun(dur)
 
         # cancel attack instantly
         self.attack_timer = 0.0
@@ -52,6 +54,25 @@ class Zombie(EnemyBase):
         self.cooldown_timer = self.attack_cooldown
 
     # -------------------------
+    # UPDATE (override enkel om stun anim trager te maken)
+    # -------------------------
+    def update(self, dt: float, player):
+        # death fade + remove => EnemyBase regelt dit
+        if self.dead:
+            super().update(dt, player)
+            return
+
+        # stun: zelf afhandelen zodat anim trager loopt + grey effect zichtbaar blijft
+        if self.stun_timer > 0:
+            self.stun_timer = max(0.0, self.stun_timer - dt)
+            self.anim.update(dt * self.stun_anim_speed)
+            self.rect.midbottom = self.pos
+            return
+
+        # anders normale flow (roept update_alive)
+        super().update(dt, player)
+
+    # -------------------------
     # UPDATE ALIVE
     # -------------------------
     def update_alive(self, dt: float, player):
@@ -59,20 +80,11 @@ class Zombie(EnemyBase):
         if self.cooldown_timer > 0:
             self.cooldown_timer = max(0.0, self.cooldown_timer - dt)
 
-        # stun blocks everything
-        if self.stun_timer > 0:
-            self.stun_timer = max(0.0, self.stun_timer - dt)
-            # slow anim while stunned
-            self.anim.update(dt * self.stun_anim_speed)
-            self.rect.midbottom = self.pos
-            return
-
         # hurt one-shot
         if self.anim.state == "hurt":
             self.anim.update(dt)
             if self.anim.finished:
                 self.anim.play("idle")
-            self.rect.midbottom = self.pos
             return
 
         # attack state
@@ -84,13 +96,11 @@ class Zombie(EnemyBase):
                 if abs(player.rect.centerx - self.rect.centerx) <= self.attack_range:
                     blocked = player.take_damage(self.attack_damage)
                     if blocked:
-                        self.stun()  # <- stun + grey effect
+                        self.stun()
                 self.attack_hit_done = True
 
             if self.anim.finished:
                 self.anim.play("idle")
-
-            self.rect.midbottom = self.pos
             return
 
         # AI: decide move/attack
@@ -101,7 +111,6 @@ class Zombie(EnemyBase):
         if dist <= self.attack_range and self.cooldown_timer <= 0:
             self.facing_right = (dx > 0)
             self.start_attack()
-            self.rect.midbottom = self.pos
             return
 
         # walk towards player
@@ -115,37 +124,6 @@ class Zombie(EnemyBase):
             self.anim.play("walk")
             self.anim.update(dt)
 
-        self.rect.midbottom = self.pos
-
-    # -------------------------
-    # UPDATE DEAD 
-    # -------------------------
-    
-    def update_dead(self, dt: float):
-        """
-        Wordt door EnemyBase.update() aangeroepen wanneer self.dead == True
-        Zorgt voor fade-out i.p.v. instant remove.
-        """
-        # anim blijft lopen (dead anim)
-        self.anim.update(dt)
-
-        # zorg dat deze velden bestaan (safety)
-        if not hasattr(self, "death_linger"):
-            self.death_linger = 1.2
-        if not hasattr(self, "death_timer"):
-            self.death_timer = self.death_linger
-        if not hasattr(self, "alpha"):
-            self.alpha = 255
-
-        # timer down + alpha down
-        self.death_timer = max(0.0, self.death_timer - dt)
-        self.alpha = int(255 * (self.death_timer / self.death_linger))
-
-        if self.death_timer <= 0.0:
-            self.remove = True
-
-        self.rect.midbottom = self.pos
-
     # -------------------------
     # GRAYSCALE HELP
     # -------------------------
@@ -155,7 +133,6 @@ class Zombie(EnemyBase):
         if cached is not None:
             return cached
 
-        # make sure we keep alpha
         s = surf.convert_alpha()
         arr = pygame.surfarray.array3d(s)
 
@@ -177,17 +154,17 @@ class Zombie(EnemyBase):
     def draw(self, screen: pygame.Surface):
         img = self.anim.get_image(self.facing_right)
 
-        # stun tint (grey + slight blue add)
+        # stun tint (grey + slight blue add) — ook tijdens stun zichtbaar
         if self.stun_timer > 0 and (not self.dead):
             gray = self._get_grayscale(img)
             fx = gray.copy()
             fx.fill((15, 25, 45), special_flags=pygame.BLEND_RGB_ADD)
             img = fx
 
-        # ✅ ALWAYS apply death alpha if dead
-        if self.dead:
+        # ✅ death fade komt uit EnemyBase (self.alpha), dus respecteer dat
+        if self.dead and getattr(self, "alpha", 255) < 255:
             img = img.copy()
-            img.set_alpha(getattr(self, "alpha", 255))
+            img.set_alpha(self.alpha)
 
         screen.blit(img, self.rect)
 
