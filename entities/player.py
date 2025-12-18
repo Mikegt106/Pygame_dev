@@ -70,6 +70,9 @@ class Player:
 
         self.anim = Animator(animations, default="idle", fps=fps)
 
+        # ✅ jump anim lock (speel jump volledig uit)
+        self.jump_anim_lock = False
+
         # position
         self.image = self.anim.get_image(self.facing_right)
         self.rect = self.image.get_rect()
@@ -87,7 +90,6 @@ class Player:
         self.gravity = 2600.0
         self.jump_strength = 950.0
 
-        self.was_on_ground = True
         self.on_ground = True
         self.ground_y = y
 
@@ -132,7 +134,9 @@ class Player:
         if self.hurt_timer > 0:
             self.hurt_timer = max(0.0, self.hurt_timer - dt)
 
-        # jump input
+        # ----------------------
+        # JUMP INPUT
+        # ----------------------
         jump_now = keys[pygame.K_SPACE]
         jump_pressed = jump_now and not self.jump_key_prev
         self.jump_key_prev = jump_now
@@ -145,12 +149,14 @@ class Player:
             and (self.hurt_timer <= 0)
             and (not self.dead)
         )
+
         if can_start_jump:
             self.vel_y = -self.jump_strength
-            self.on_ground = False  # direct, zodat hij deze frame al airborne is
+            self.on_ground = False
 
-            # ✅ start jump anim meteen en 1x (one-shot)
+            # ✅ lock jump anim until finished + landed
             if "jump" in self.anim.animations:
+                self.jump_anim_lock = True
                 self.anim.play("jump", reset_if_same=True)
 
         # ======================
@@ -174,20 +180,26 @@ class Player:
             else:
                 self.block_push_vel = min(0.0, self.block_push_vel + self.block_push_damping * dt)
 
-        # priority
+        # ----------------------
+        # PRIORITY STATES
+        # ----------------------
         if self.dead:
+            self.jump_anim_lock = False
             self.anim.play("dead")
             self.anim.update(dt)
             self.rect.midbottom = self.pos
             return
 
         if self.hurt_timer > 0:
+            self.jump_anim_lock = False
             self.anim.play("hurt")
             self.anim.update(dt)
             self.rect.midbottom = self.pos
             return
 
-        # inputs (attack/move)
+        # ----------------------
+        # INPUTS (attack/move)
+        # ----------------------
         mouse_buttons = pygame.mouse.get_pressed()
         attack_now = keys[pygame.K_RETURN] or mouse_buttons[0]
         attack_pressed = attack_now and not self.attack_key_prev
@@ -241,15 +253,23 @@ class Player:
                 self.anim.play("protect")
                 self.anim.update(dt)
 
-            # ✅ airborne: hou jump aan tot landing (geen fall-switch)
+            # ✅ jump lock krijgt voorrang op ALLES (ook al ben je al geland)
+            elif self.jump_anim_lock and ("jump" in self.anim.animations):
+                self.anim.play("jump")  # niet resetten
+                self.anim.update(dt)
+
+                # unlock pas als anim klaar is én je op de grond staat
+                if self.anim.finished and self.on_ground:
+                    self.jump_anim_lock = False
+
+            # (optioneel) als je ooit een "fall" anim wil: hier toevoegen
             elif not self.on_ground:
                 if "jump" in self.anim.animations:
-                    if self.anim.state != "jump":
-                        self.anim.play("jump", reset_if_same=True)
-                    self.anim.update(dt)
+                    # tijdens airtime (zonder lock) toch jump tonen
+                    self.anim.play("jump")
                 else:
                     self.anim.play("idle")
-                    self.anim.update(dt)
+                self.anim.update(dt)
 
             elif moving:
                 if sprinting and ("run" in self.anim.animations):
@@ -261,13 +281,6 @@ class Player:
             else:
                 self.anim.play("idle")
                 self.anim.update(dt)
-
-        # ✅ landing detect (na anim update)
-        if (not self.was_on_ground) and self.on_ground:
-            # net geland -> terug naar idle (of walk als je wil)
-            self.anim.play("walk" if moving else "idle", reset_if_same=True)
-
-        self.was_on_ground = self.on_ground
 
         self.rect.midbottom = self.pos
 
