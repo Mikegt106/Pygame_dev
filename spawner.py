@@ -1,77 +1,46 @@
 # spawner.py
 import random
-
+from entities.enemies.registry import ENEMY_REGISTRY
 
 class EnemySpawner:
-    def __init__(
-        self,
-        enemy_cls,
-        enemy_cfg: dict,
-        spawn_y: int,
-        interval_min: float = 1.2,
-        interval_max: float = 2.5,
-        max_enemies: int = 6,
-        min_dist_from_player: int = 250,
-        spawn_ahead_min: int = 400,
-        spawn_ahead_max: int = 900,
-        spawn_behind_chance: float = 0.20,
-    ):
-        self.enemy_cls = enemy_cls
-        self.enemy_cfg = enemy_cfg
+    def __init__(self, pool, cfg_module, spawn_y=680, interval_min=1.2, interval_max=2.5, max_enemies=6):
+        self.pool = pool                  # config.ENEMY_POOL
+        self.cfg_module = cfg_module      # config module zelf
         self.spawn_y = spawn_y
-
         self.interval_min = interval_min
         self.interval_max = interval_max
         self.max_enemies = max_enemies
 
-        self.min_dist_from_player = min_dist_from_player
-        self.spawn_ahead_min = spawn_ahead_min
-        self.spawn_ahead_max = spawn_ahead_max
-        self.spawn_behind_chance = spawn_behind_chance
-
         self.timer = 0.0
-        self.next_spawn = random.uniform(self.interval_min, self.interval_max)
+        self.next_interval = random.uniform(interval_min, interval_max)
 
     def reset(self):
         self.timer = 0.0
-        self.next_spawn = random.uniform(self.interval_min, self.interval_max)
+        self.next_interval = random.uniform(self.interval_min, self.interval_max)
 
-    def _pick_spawn_x(self, player_x: float, world_width: int | None):
-        # meestal voor de player, soms achter
-        behind = random.random() < self.spawn_behind_chance
-        if behind:
-            dx = random.uniform(self.spawn_ahead_min, self.spawn_ahead_max)
-            x = player_x - dx
-        else:
-            dx = random.uniform(self.spawn_ahead_min, self.spawn_ahead_max)
-            x = player_x + dx
+    def _pick_enemy_spec(self):
+        weights = [e["weight"] for e in self.pool]
+        spec = random.choices(self.pool, weights=weights, k=1)[0]
+        return spec
 
-        # clamp in world
-        if world_width is not None:
-            x = max(0, min(world_width, x))
-
-        return x
-
-    def update(self, dt: float, player, enemies: list, world_width: int | None = None):
-        # tel alleen levende enemies mee (dode mogen nog liggen/faden)
-        alive = sum(1 for e in enemies if not getattr(e, "dead", False))
-        if alive >= self.max_enemies:
+    def update(self, dt, player, enemies, world_width=6000):
+        if len(enemies) >= self.max_enemies:
             return
 
         self.timer += dt
-        if self.timer < self.next_spawn:
+        if self.timer < self.next_interval:
             return
 
         self.timer = 0.0
-        self.next_spawn = random.uniform(self.interval_min, self.interval_max)
+        self.next_interval = random.uniform(self.interval_min, self.interval_max)
 
         px = player.rect.centerx
-        x = self._pick_spawn_x(px, world_width)
+        x = px + random.randint(-600, 600)
+        x = max(50, min(world_width - 50, x))
 
-        # niet te dicht bij player
-        if abs(x - px) < self.min_dist_from_player:
-            x = px + (self.min_dist_from_player if x >= px else -self.min_dist_from_player)
-            if world_width is not None:
-                x = max(0, min(world_width, x))
+        spec = self._pick_enemy_spec()
 
-        enemies.append(self.enemy_cls(int(x), self.spawn_y, self.enemy_cfg))
+        enemy_cls = ENEMY_REGISTRY[spec["type"]]
+        enemy_cfg = getattr(self.cfg_module, spec["cfg_key"])  # "ZOMBIE" -> config.ZOMBIE
+
+        enemies.append(enemy_cls(x, self.spawn_y, enemy_cfg))

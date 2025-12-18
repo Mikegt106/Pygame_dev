@@ -1,5 +1,6 @@
 import pygame
 from entities.enemies.enemy_base import EnemyBase
+from entities.enemies.registry import register_enemy
 
 
 class Zombie(EnemyBase):
@@ -149,3 +150,5 @@ class Zombie(EnemyBase):
             img.set_alpha(self.alpha)
 
         screen.blit(img, self.rect)
+        
+register_enemy("zombie", Zombie)

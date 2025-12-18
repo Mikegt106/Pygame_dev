@@ -1,5 +1,2 @@
 from .zombie import Zombie
-
-ENEMY_TYPES = {
-    "zombie": Zombie,
-}
+from .zombie2 import Zombie2 
