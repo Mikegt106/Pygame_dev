@@ -1,26 +1,27 @@
+# movement.py
 import pygame
 
 class Movement:
-    def __init__(self, speed: float = 250, sprint_speed: float = 420):
+    def __init__(self, speed=250, sprint_speed=420):
         self.speed = speed
         self.sprint_speed = sprint_speed
 
-    def update_horizontal(self, keys, pos, dt, speed_mult=1.0):
-        moving = False
-        facing_right = True
+    def update_horizontal(self, keys, pos, dt, speed_mult=1.0, sprinting=False):
+        left  = keys[pygame.K_q]
+        right = keys[pygame.K_d]
 
-        sprinting = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
-        base_speed = self.sprint_speed if sprinting else self.speed
-        current_speed = base_speed * speed_mult
+        direction = 0
+        if left and not right:
+            direction = -1
+        elif right and not left:
+            direction = 1
 
-        if keys[pygame.K_q] or keys[pygame.K_LEFT]:
-            pos.x -= current_speed * dt
-            moving = True
-            facing_right = False
+        moving = direction != 0
+        facing_right = True if direction >= 0 else False
 
-        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-            pos.x += current_speed * dt
-            moving = True
-            facing_right = True
+        speed = (self.sprint_speed if sprinting else self.speed) * speed_mult
+
+        if moving:
+            pos.x += direction * speed * dt
 
         return moving, facing_right, sprinting

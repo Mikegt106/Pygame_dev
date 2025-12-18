@@ -54,7 +54,16 @@ while running:
         player.update(keys, dt, projectiles, PROJECTILES)
 
     # ✅ update bar values (mana later uit player)
-    statui.set_values(player.hp, 50, max_hp=PLAYER.get("hp", 10), max_mana=50)
+    statui.set_values(
+        hp=player.hp,
+        mana=int(player.mana),
+        max_hp=player.max_hp,
+        max_mana=int(player.max_mana),
+        mana_draining=player.mana_draining,
+        mana_regening=player.mana_regening,
+        mana_exhausted=player.mana_exhausted,
+    )
+    statui.update(dt)
 
     # draw
     screen.fill((20, 20, 20))

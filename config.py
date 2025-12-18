@@ -2,6 +2,7 @@ PLAYER = {
     "scale": 3,
     "fps": 12,
     "hp": 10,
+    "mana": 10,
 
     "speed": 250,
     "sprint_speed": 420,

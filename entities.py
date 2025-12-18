@@ -18,7 +18,19 @@ class Player:
         self.attack_spawned = False
 
         # stats
-        self.hp = config.get("hp", 10)
+        self.max_hp = config.get("hp", 10)
+        self.hp = self.max_hp
+
+        # mana
+        self.max_mana = float(config.get("mana", 50))
+        self.mana = float(self.max_mana)
+
+        self.mana_drain_run = 18.0   # mana per seconde tijdens run
+        self.mana_regen = 12.0       # mana per seconde als je NIET runt
+
+        self.mana_exhausted = False          # lock sprint until full
+        self.mana_draining = False           # UI hint
+        self.mana_regening = False           # UI hint
 
         # damage feedback
         self.damage_timer = 0.0
@@ -32,6 +44,9 @@ class Player:
         # hurt state
         self.hurt_timer = 0.0
         self.hurt_duration = 0.25
+
+        # blocking flag (betrouwbaar voor damage)
+        self.blocking = False
 
         # config
         scale = config.get("scale", 2)
@@ -102,6 +117,7 @@ class Player:
         self.attack_key_prev = attack_now
 
         protecting = keys[pygame.K_e]
+        self.blocking = protecting  # ✅ betrouwbare flag
 
         # --- Jump input (just pressed) ---
         jump_now = keys[pygame.K_SPACE]
@@ -118,8 +134,7 @@ class Player:
         if self.damage_timer > 0:
             self.damage_timer = max(0.0, self.damage_timer - dt)
 
-        # ---- START JUMP (only if grounded and allowed) ----
-        # (Do this BEFORE physics update so jump starts instantly)
+        # ---- START JUMP ----
         if jump_pressed and self.on_ground and (self.anim.state != "attack") and (not protecting) and (not self.dead):
             self.vel_y = -self.jump_strength
             self.on_ground = False
@@ -127,12 +142,11 @@ class Player:
             self.jump_total = (2 * self.jump_strength) / self.gravity
 
         # =========================================================
-        # ✅ PHYSICS ALWAYS (so hurt/dead never "hang" mid-air)
+        # ✅ PHYSICS ALWAYS
         # =========================================================
         self.vel_y += self.gravity * dt
         self.pos.y += self.vel_y * dt
 
-        # ground collision
         if self.pos.y >= self.ground_y:
             self.pos.y = self.ground_y
             self.vel_y = 0.0
@@ -144,18 +158,15 @@ class Player:
         if self.dead:
             self.pos.x += self.dead_vel_x * dt
             if self.on_ground:
-                self.dead_vel_x *= 0.85  # friction on ground
+                self.dead_vel_x *= 0.85
 
         # ----- PRIORITY STATES -----
-
-        # DEAD: play death sheet, no input/movement
         if self.dead:
             self.anim.play("dead")
             self.anim.update(dt)
             self.rect.midbottom = self.pos
             return
 
-        # HURT: short stun, blocks input/movement BUT still falls due to physics above
         if self.hurt_timer > 0:
             self.hurt_timer = max(0.0, self.hurt_timer - dt)
             self.anim.play("hurt")
@@ -168,15 +179,54 @@ class Player:
 
         moving = False
         sprinting = False
+
+        # reset UI flags each frame
+        self.mana_draining = False
+        self.mana_regening = False
+
         if can_move:
-            air_mult = 1.6 if not self.on_ground else 1.0  # forward momentum in air
+            air_mult = 1.6 if not self.on_ground else 1.0
+
+            want_sprint = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+
+            # ✅ exhaustion lock logic:
+            # - als mana 0 -> exhausted True
+            # - pas resetten als mana terug VOL is
+            if self.mana <= 0:
+                self.mana = 0
+                self.mana_exhausted = True
+
+            if self.mana_exhausted and self.mana >= self.max_mana:
+                self.mana = self.max_mana
+                self.mana_exhausted = False
+
+            # sprint allowed?
+            sprinting = want_sprint and (not self.mana_exhausted) and (self.mana > 0)
+
             moving, facing_right, sprinting = self.movement.update_horizontal(
-                keys, self.pos, dt, speed_mult * air_mult
+                keys, self.pos, dt, speed_mult * air_mult, sprinting=sprinting
             )
+
             if moving:
                 self.facing_right = facing_right
 
-        # ---- JUMP ANIM SYNC (NO MID-AIR END) ----
+            # ----- MANA DRAIN/REGEN -----
+            if sprinting and moving and (not self.mana_exhausted):
+                self.mana_draining = True
+                self.mana -= self.mana_drain_run * dt
+
+                if self.mana <= 0:
+                    self.mana = 0
+                    self.mana_exhausted = True
+            else:
+                # regen alleen als je NIET sprint
+                if self.mana < self.max_mana:
+                    self.mana_regening = True
+                    self.mana += self.mana_regen * dt
+                    if self.mana > self.max_mana:
+                        self.mana = self.max_mana
+
+        # ---- JUMP ANIM SYNC ----
         if (not self.on_ground) and ("jump" in self.anim.animations) and (self.anim.state != "attack") and (not protecting):
             self.jump_t += dt
             progress = 0.0 if self.jump_total <= 0 else (self.jump_t / self.jump_total)
@@ -201,7 +251,6 @@ class Player:
             self.anim.update(dt)
             self.attack_timer += dt
 
-            # spawn projectile once, after delay
             if (self.attack_timer >= self.attack_delay) and (not self.attack_spawned):
                 direction = 1 if self.facing_right else -1
                 spawn_x = self.rect.centerx + (30 * direction)
@@ -235,18 +284,21 @@ class Player:
                 self.anim.play("idle")
                 self.anim.update(dt)
 
-        # sync rect
         self.rect.midbottom = self.pos
 
     def take_damage(self, amount: int):
         if self.dead:
             return
 
+        # ✅ block = no damage (of kies 0.3 voor chip damage)
+        if self.blocking:
+            return
+            # of: amount = int(amount * 0.3)
+
         self.hp -= amount
         if self.hp < 0:
             self.hp = 0
 
-        # flash + slow + hurt stun
         self.damage_timer = self.damage_flash_duration
         self.slow_timer = self.slow_duration
         self.hurt_timer = self.hurt_duration
@@ -255,14 +307,12 @@ class Player:
             self.dead = True
             self.anim.play("dead", reset_if_same=True)
 
-            # keep momentum: drift in facing direction (gravity continues in update)
             direction = 1 if self.facing_right else -1
-            self.dead_vel_x = direction * 260.0  # tweak (200-450)
+            self.dead_vel_x = direction * 260.0
 
     def draw(self, screen: pygame.Surface):
         img = self.anim.get_image(self.facing_right)
 
-        # damage flash
         if self.damage_timer > 0:
             flash = img.copy()
             flash.fill((255, 0, 0), special_flags=pygame.BLEND_RGBA_MULT)
