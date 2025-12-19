@@ -113,12 +113,18 @@ while running:
     for c in pickups:
         c.update(dt)
 
-        if player.rect.colliderect(c.rect):
-            player.coins = getattr(player, "coins", 0) + getattr(c, "amount", 1)
-            if hasattr(c, "collect"):
-                c.collect()
-            else:
-                c.dead = True
+        PICKUP_DIST = 22 
+
+        px, py = player.rect.midbottom
+        cx, cy = c.rect.center
+
+        dx = px - cx
+        dy = py - cy
+
+        if (dx*dx + dy*dy) <= (PICKUP_DIST * PICKUP_DIST):
+            player.coins = getattr(player, "coins", 0) + getattr(c, "value", 1)
+            c.dead = True
+            continue
 
     # --------------------------------------------------
     # COLLISIONS (projectiles -> enemies)

@@ -57,6 +57,11 @@ ZOMBIE = {
     "attack_cooldown": 1.0,    # seconden tussen aanvallen
     "attack_hit_time": 0.25,   # wanneer hit gebeurt tijdens attack anim (sec)
     "stun_duration": 0.35,
+    
+    "loot": {
+        "coins_min": 4,
+        "coins_max": 6,
+    },
 
     "anims": {
         "idle":   {"sheet": "assets/Zombie/Idle.png",   "frames": 6,  "loop": True},
@@ -78,6 +83,11 @@ ZOMBIE2 = {
     "attack_cooldown": 1.0,    # seconden tussen aanvallen
     "attack_hit_time": 0.25,   # wanneer hit gebeurt tijdens attack anim (sec)
     "stun_duration": 0.35,
+    
+    "loot": {
+        "coins_min": 1,
+        "coins_max": 2,
+    },
 
     "anims": {
         "idle":   {"sheet": "assets/Zombie2/Idle.png",   "frames": 7,  "loop": True},
