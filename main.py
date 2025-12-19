@@ -247,6 +247,25 @@ while running:
     # PLAYER UPDATE (met UI block)
     # --------------------------------------------------
     player.update(keys, dt, projectiles, config.PROJECTILES, ui_block_input)
+    
+    # ----------------------------------
+    # KEEP PLAYER INSIDE SCREEN
+    # ----------------------------------
+    SW, SH = screen.get_size()
+    MARGIN_X = 5
+
+    if player.rect.centerx < MARGIN_X:
+        player.rect.centerx = MARGIN_X
+    if player.rect.centerx > SW - MARGIN_X:
+        player.rect.centerx = SW - MARGIN_X
+        
+    if hasattr(player, "pos"):
+        try:
+            player.pos.x = float(player.rect.centerx)
+        except Exception:
+            pass
+    if hasattr(player, "x"):
+        player.x = float(player.rect.centerx)
 
     # --------------------------------------------------
     # SPAWN
