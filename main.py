@@ -4,10 +4,11 @@ import config
 import entities.enemies  # IMPORTANT: registreert enemy classes
 
 from entities import Player
-from ui_statbar import StatBarUI
+from ui.ui_statbar import StatBarUI
 from spawner import EnemySpawner
 from wave_system import WaveSystem
 from loot_system import LootSystem
+from ui.menu_ui import MenuUI
 
 pygame.init()
 
@@ -21,6 +22,7 @@ clock = pygame.time.Clock()
 WORLD_WIDTH = 6000
 
 statui = StatBarUI()
+menu_ui = MenuUI(screen, scale=1.6)
 loot_sys = LootSystem(coins_min=0, coins_max=4)
 
 # --------------------------------------------------
@@ -71,7 +73,15 @@ while running:
             running = False
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-            player, projectiles, enemies, pickups = reset_game()  # ✅ pickups ook resetten
+            player, projectiles, enemies, pickups = reset_game()  
+        
+        clicked = menu_ui.handle_event(event)
+        if clicked == 0:
+            print("Backpack clicked")
+        elif clicked == 1:
+            print("Profile clicked")
+        elif clicked == 2:
+            print("Settings clicked")
 
     keys = pygame.key.get_pressed()
 
@@ -108,28 +118,16 @@ while running:
         p.update(dt)
 
     # --------------------------------------------------
-    # PICKUPS UPDATE  ✅
+    # PICKUPS UPDATE
     # --------------------------------------------------
     for c in pickups:
         was_collected = getattr(c, "collected", False)
+
+        # coin beslist zelf magnet + collect
         c.update(dt, player.rect.midbottom)
 
-        # als hij net collected is geworden -> coins adden 1x
         if (not was_collected) and getattr(c, "collected", False):
             player.coins = getattr(player, "coins", 0) + getattr(c, "value", 1)
-
-        PICKUP_DIST = 22 
-
-        px, py = player.rect.midbottom
-        cx, cy = c.rect.center
-
-        dx = px - cx
-        dy = py - cy
-
-        if (dx*dx + dy*dy) <= (PICKUP_DIST * PICKUP_DIST):
-            player.coins = getattr(player, "coins", 0) + getattr(c, "value", 1)
-            c.dead = True
-            continue
 
     # --------------------------------------------------
     # COLLISIONS (projectiles -> enemies)
@@ -202,6 +200,7 @@ while running:
         screen.blit(toast, rect)
 
     statui.draw(screen)
+    menu_ui.draw()
     player.draw(screen)
 
     for e in enemies:
