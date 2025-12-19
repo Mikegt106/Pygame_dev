@@ -19,13 +19,13 @@ pygame.init()
 #----------------------------------
 # BACKGROUND MUSIC
 #----------------------------------
-pygame.mixer.init()     
-pygame.mixer.music.load("assets/Sounds/bg_music.mp3") 
+pygame.mixer.init()
+pygame.mixer.music.load("assets/Sounds/bg_music.mp3")
 pygame.mixer.music.set_volume(0.35)  # 0.0 - 1.0
 pygame.mixer.music.play(-1)  # -1 = loop forever
 
 # SFX
-school_bell = pygame.mixer.Sound("assets/Sounds/school_bell.mp3") 
+school_bell = pygame.mixer.Sound("assets/Sounds/school_bell.mp3")
 school_bell.set_volume(0.7)
 
 #----------------------------------
@@ -36,11 +36,15 @@ font_big = pygame.font.SysFont(None, 96)
 font_small = pygame.font.SysFont(None, 24)
 
 screen = pygame.display.set_mode((1280, 720))
+scene_cache = {}
 main_screen = MainScreen(screen)
-state = "MAIN" 
+state = "MAIN"
 clock = pygame.time.Clock()
 
 WORLD_WIDTH = 6000
+
+# ✅ current scene persistence (fix voor “leeg scherm”)
+current_scene = None
 
 #----------------------------------
 # UI INITIALISATION
@@ -51,11 +55,9 @@ inventory_ui = InventoryUI(screen)
 loot_sys = LootSystem()
 dialogue_ui = DialogueUI(screen)
 
-
 #----------------------------------
 # SYSTEM klaarzetten
 #----------------------------------
-
 spawner = EnemySpawner(
     pool=config.ENEMY_POOL,
     cfg_module=config,
@@ -68,12 +70,13 @@ spawner = EnemySpawner(
 wave_sys = WaveSystem(waves=config.WAVES, break_time=4.0)
 wave_sys.start()
 
+
 def start_intro():
     global state
-
     dialogue_ui.start(get_intro_lines())
     state = "INTRO"
-    
+
+
 def reset_game():
     spawner.reset()
     wave_sys.start()
@@ -83,7 +86,31 @@ def reset_game():
     pickups = []
     return player, projectiles, enemies, pickups
 
+
 player, projectiles, enemies, pickups = reset_game()
+
+
+def draw_scene_background(path: str):
+    if not path:
+        screen.fill((20, 20, 20))
+        return
+
+    if path not in scene_cache:
+        img = pygame.image.load(path).convert()
+        img = pygame.transform.scale(img, screen.get_size())
+        scene_cache[path] = img
+
+    screen.blit(scene_cache[path], (0, 0))
+
+
+def set_scene_for_wave(wave_nr: int):
+    """Zet current_scene op basis van config.WAVES[wave_nr]['scene']."""
+    global current_scene
+    cfg = config.WAVES.get(wave_nr, {})
+    scene = cfg.get("scene")
+    if scene:
+        current_scene = scene
+
 
 # ----------------------------
 # FADE-IN (na intro)
@@ -105,8 +132,6 @@ while running:
     # --------------------------------------------------
     # EVENTS
     # --------------------------------------------------
-    ui_used_click_this_frame = False
-
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -125,6 +150,10 @@ while running:
 
             if dialogue_ui.is_done():
                 school_bell.play()      # 🔔 play bell
+
+                # ✅ zet bg al klaar voor wave 1 zodat FADEIN niet leeg is
+                set_scene_for_wave(1)
+
                 state = "FADEIN"
                 fade_alpha = 255        # start fully black
             continue
@@ -158,15 +187,14 @@ while running:
         main_screen.draw()
         pygame.display.flip()
         continue
-    
+
     if state == "INTRO":
         screen.fill((10, 10, 10))
-
         dialogue_ui.update(dt)
         dialogue_ui.draw()
         pygame.display.flip()
         continue
-    
+
     if state == "FADEIN":
         # update fade
         fade_alpha -= fade_speed * dt
@@ -174,10 +202,8 @@ while running:
             fade_alpha = 0
             state = "PLAY"
 
-        # teken alvast de "game world" (maar nog zonder updates/spawns)
-        screen.fill((20, 20, 20))
-
-        # toon player idle zodat je iets ziet onder de fade
+        # ✅ teken alvast background + player onder de fade
+        draw_scene_background(current_scene)
         player.draw(screen)
 
         # UI bovenop (optioneel)
@@ -291,7 +317,12 @@ while running:
     # --------------------------------------------------
     # DRAW
     # --------------------------------------------------
-    screen.fill((20, 20, 20))
+    current_wave_cfg = config.WAVES.get(wave_sys.wave, {})
+
+    # ✅ kies wave scene, of fallback naar current_scene
+    scene = current_wave_cfg.get("scene") or current_scene
+    current_scene = scene  # onthoud laatste scene
+    draw_scene_background(scene)
 
     wave_text = font.render(f"WAVE {wave_sys.wave} - {wave_sys.state}", True, (255, 255, 255))
     screen.blit(wave_text, (100, 10))

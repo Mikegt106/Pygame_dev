@@ -26,9 +26,10 @@ ENEMY_POOL = [
 
 WAVES = {
     1: {"pool": [{"type":"zombie","cfg_key":"ZOMBIE","weight":100}],
-        "max_enemies": 4,      #Totaal enemies tegelijk
+        "max_enemies": 4,
         "interval": (1.6, 2.4),
-        "total_spawns": 4,     #totaal in deze wave
+        "total_spawns": 4,
+        "scene": "assets/Scenes/schoolyard.png",
     },
 
     2: {"pool": [{"type":"zombie","cfg_key":"ZOMBIE","weight":80},
@@ -36,6 +37,7 @@ WAVES = {
         "max_enemies": 5,
         "interval": (1.3, 2.0),
         "total_spawns": 8,
+        "scene": "assets/Scenes/schoolyard.png",  # mag dezelfde blijven
     },
 
     3: {"pool": [{"type":"zombie","cfg_key":"ZOMBIE","weight":60},
@@ -43,6 +45,7 @@ WAVES = {
         "max_enemies": 6,
         "interval": (1.1, 1.7),
         "total_spawns": 12,
+        "scene": "assets/Scenes/schoolyard.png",
     },
 }
 

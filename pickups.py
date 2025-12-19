@@ -26,7 +26,7 @@ class CoinPickup:
         self.base_y = int(y)
 
         # --------- LOAD IMAGES ONCE ----------
-        scale_multiplier = 1.5
+        scale_multiplier = 2
         if CoinPickup.COIN_SMALL is None:
             CoinPickup.COIN_SMALL = pygame.transform.scale(
                 load_image("assets/Items/Coin.png", alpha=True), (22*scale_multiplier, 22*scale_multiplier)
