@@ -56,20 +56,26 @@ ZOMBIE = {
     "hp": 5,
 
     "attack_damage": 2,
-    "attack_range": 90,        # pixels (tweak)
-    "attack_cooldown": 1.0,    # seconden tussen aanvallen
-    "attack_hit_time": 0.25,   # wanneer hit gebeurt tijdens attack anim (sec)
+    "attack_range": 90,
+    "attack_cooldown": 1.0,
+    "attack_hit_time": 0.25,
     "stun_duration": 0.35,
-    
+
     "loot": {
         "coins_min": 4,
         "coins_max": 6,
+
+        "item_chance": 0.25,  # 25% kans op een HP-item
+        "item_weights": {     # als item dropt: meestal apple
+            "apple": 80,
+            "hp_potion": 20,
+        },
     },
 
     "anims": {
         "idle":   {"sheet": "assets/Zombie/Idle.png",   "frames": 6,  "loop": True},
         "walk":   {"sheet": "assets/Zombie/Walk.png",   "frames": 10, "loop": True},
-        "attack": {"sheet": "assets/Zombie/Attack.png", "frames": 4,  "loop": False},  # <-- belangrijk
+        "attack": {"sheet": "assets/Zombie/Attack.png", "frames": 4,  "loop": False},
         "hurt":   {"sheet": "assets/Zombie/Hurt.png",   "frames": 4,  "loop": False},
         "dead":   {"sheet": "assets/Zombie/Dead.png",   "frames": 5,  "loop": False},
     }
@@ -82,20 +88,26 @@ ZOMBIE2 = {
     "hp": 5,
 
     "attack_damage": 2,
-    "attack_range": 90,        # pixels (tweak)
-    "attack_cooldown": 1.0,    # seconden tussen aanvallen
-    "attack_hit_time": 0.25,   # wanneer hit gebeurt tijdens attack anim (sec)
+    "attack_range": 90,
+    "attack_cooldown": 1.0,
+    "attack_hit_time": 0.25,
     "stun_duration": 0.35,
-    
+
     "loot": {
         "coins_min": 9,
         "coins_max": 11,
+
+        "item_chance": 0.55,  # 55% kans op item (sterker enemy)
+        "item_weights": {     # potion vaker dan apple
+            "apple": 30,
+            "hp_potion": 70,
+        },
     },
 
     "anims": {
         "idle":   {"sheet": "assets/Zombie2/Idle.png",   "frames": 7,  "loop": True},
         "walk":   {"sheet": "assets/Zombie2/Walk.png",   "frames": 12, "loop": True},
-        "attack": {"sheet": "assets/Zombie2/Attack.png", "frames": 10,  "loop": False},  # <-- belangrijk
+        "attack": {"sheet": "assets/Zombie2/Attack.png", "frames": 10, "loop": False},
         "hurt":   {"sheet": "assets/Zombie2/Hurt.png",   "frames": 4,  "loop": False},
         "dead":   {"sheet": "assets/Zombie2/Dead.png",   "frames": 5,  "loop": False},
     }
@@ -116,3 +128,15 @@ DAMAGE = {
     "book": 1
 }
 
+ITEMS = {
+    "apple": {
+        "image": "assets/Items/Apple.png",
+        "heal": 15,
+        "weight": 70,   # drop chance
+    },
+    "hp_potion": {
+        "image": "assets/Items/HP_potion.png",
+        "heal": 40,
+        "weight": 30,
+    },
+}

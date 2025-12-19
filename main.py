@@ -296,7 +296,7 @@ while running:
         # pickups
         for c in pickups:
             was_collected = getattr(c, "collected", False)
-            c.update(dt, player.rect.midbottom)
+            c.update(dt, player)
             if (not was_collected) and getattr(c, "collected", False):
                 player.coins = getattr(player, "coins", 0) + getattr(c, "value", 1)
 
@@ -315,7 +315,7 @@ while running:
         # cleanup
         projectiles = [p for p in projectiles if not p.is_dead()]
         enemies = [e for e in enemies if not getattr(e, "remove", False)]
-        pickups = [c for c in pickups if not getattr(c, "dead", False) and not getattr(c, "remove", False)]
+        pickups = [c for c in pickups if not getattr(c, "remove", False) and not c.is_dead()]
 
     # --------------------------------------------------
     # UI UPDATE (mag ook tijdens pause, toont HP/coins etc.)
