@@ -14,6 +14,7 @@ from ui.main_screen import MainScreen
 from dialogue.intro import get_intro_lines
 from ui.dialogue_ui import DialogueUI
 from ui.settings_menu import SettingsMenu
+from ui.profile_menu import ProfileMenu
 
 pygame.init()
 
@@ -56,6 +57,7 @@ inventory_ui = InventoryUI(screen)
 loot_sys = LootSystem()
 dialogue_ui = DialogueUI(screen)
 settings_menu = SettingsMenu(screen)
+profile_menu = ProfileMenu(screen)
 
 # ----------------------------------
 # SYSTEM klaarzetten
@@ -169,7 +171,7 @@ while running:
             if clicked == 0:
                 inventory_ui.toggle()
             elif clicked == 1:
-                print("Profile clicked")
+                profile_menu.toggle()
             elif clicked == 2:
                 settings_menu.toggle()
 
@@ -189,6 +191,8 @@ while running:
         elif action == "menu":
             state = "MAIN"
             settings_menu.visible = False
+            
+        profile_menu.handle_event(event)
 
     # --------------------------------------------------
     # STATE: MAIN
@@ -248,8 +252,10 @@ while running:
     if any(r.collidepoint(mouse_pos) for r in menu_ui.rects):
         ui_block_input = True
 
-    # settings menu = pause (blok input)
-    paused = settings_menu.visible
+    # menus die pauzeren
+    paused = settings_menu.visible or profile_menu.visible
+
+    # als menu open is: input blokkeren
     if paused:
         ui_block_input = True
 
@@ -373,6 +379,7 @@ while running:
     menu_ui.draw()
     inventory_ui.draw(player, config)
     settings_menu.draw()
+    profile_menu.draw(player)
 
     if player.dead:
         text = font_big.render("YOU DIED", True, (255, 255, 255))
