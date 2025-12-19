@@ -85,8 +85,8 @@ ZOMBIE2 = {
     "stun_duration": 0.35,
     
     "loot": {
-        "coins_min": 1,
-        "coins_max": 2,
+        "coins_min": 9,
+        "coins_max": 11,
     },
 
     "anims": {

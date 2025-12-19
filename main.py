@@ -111,7 +111,12 @@ while running:
     # PICKUPS UPDATE  ✅
     # --------------------------------------------------
     for c in pickups:
-        c.update(dt)
+        was_collected = getattr(c, "collected", False)
+        c.update(dt, player.rect.midbottom)
+
+        # als hij net collected is geworden -> coins adden 1x
+        if (not was_collected) and getattr(c, "collected", False):
+            player.coins = getattr(player, "coins", 0) + getattr(c, "value", 1)
 
         PICKUP_DIST = 22 
 
