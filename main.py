@@ -24,6 +24,10 @@ pygame.mixer.music.load("assets/Sounds/bg_music.mp3")
 pygame.mixer.music.set_volume(0.35)  # 0.0 - 1.0
 pygame.mixer.music.play(-1)  # -1 = loop forever
 
+# SFX
+school_bell = pygame.mixer.Sound("assets/Sounds/school_bell.mp3") 
+school_bell.set_volume(0.7)
+
 #----------------------------------
 # FONTS MANAGEMENT
 #----------------------------------
@@ -81,6 +85,14 @@ def reset_game():
 
 player, projectiles, enemies, pickups = reset_game()
 
+# ----------------------------
+# FADE-IN (na intro)
+# ----------------------------
+fade_alpha = 0
+fade_speed = 320  # alpha per second (sneller = sneller fade)
+fade_surface = pygame.Surface(screen.get_size())
+fade_surface.fill((0, 0, 0))
+
 #----------------------------------
 # Actual runnning
 #----------------------------------
@@ -109,9 +121,12 @@ while running:
 
         # --- INTRO (dialogue) ---
         if state == "INTRO":
-            dialogue_ui.handle_event(event)  
-            if dialogue_ui.is_done():       
-                state = "PLAY"
+            dialogue_ui.handle_event(event)
+
+            if dialogue_ui.is_done():
+                school_bell.play()      # 🔔 play bell
+                state = "FADEIN"
+                fade_alpha = 255        # start fully black
             continue
 
         # --- IN-GAME EVENTS (PLAY) ---
@@ -136,7 +151,7 @@ while running:
                 ui_used_click_this_frame = True
 
     # --------------------------------------------------
-    # MAIN SCREEN DRAW + STOP GAME LOOP
+    # STATE SCREEN DRAW + STOP GAME LOOP
     # --------------------------------------------------
     if state == "MAIN":
         main_screen.update(dt)
@@ -149,6 +164,31 @@ while running:
 
         dialogue_ui.update(dt)
         dialogue_ui.draw()
+        pygame.display.flip()
+        continue
+    
+    if state == "FADEIN":
+        # update fade
+        fade_alpha -= fade_speed * dt
+        if fade_alpha <= 0:
+            fade_alpha = 0
+            state = "PLAY"
+
+        # teken alvast de "game world" (maar nog zonder updates/spawns)
+        screen.fill((20, 20, 20))
+
+        # toon player idle zodat je iets ziet onder de fade
+        player.draw(screen)
+
+        # UI bovenop (optioneel)
+        statui.draw(screen)
+        menu_ui.draw()
+        inventory_ui.draw()
+
+        # black overlay
+        fade_surface.set_alpha(int(fade_alpha))
+        screen.blit(fade_surface, (0, 0))
+
         pygame.display.flip()
         continue
 

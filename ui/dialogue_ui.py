@@ -29,7 +29,7 @@ class DialogueUI:
         self.faces_cache = {}
         self.scene_cache = {}
 
-        # ✅ scene persistence
+        # scene persistence
         self.current_scene_path = None
 
         # --- typewriter state ---
@@ -38,14 +38,21 @@ class DialogueUI:
         self._shown_chars = 0
         self._line_done = False
 
+        # -------------------------
+        # TYPING SOUND (loop while typing, stop when done)
+        # -------------------------
+        self.dialogue_sfx = pygame.mixer.Sound("assets/Sounds/dialogue.mp3")
+        self.dialogue_sfx.set_volume(1.8)
+
+        # Dedicated channel so it never conflicts with other sounds
+        self.typing_channel = pygame.mixer.Channel(7)
+        self._typing_playing = False
+
     def start(self, lines: list[dict]):
         self.lines = lines
         self.index = 0
         self.active = True
-
-        # ✅ reset scene for a new dialogue sequence
         self.current_scene_path = None
-
         self._reset_typewriter_for_current_line()
 
     def is_done(self) -> bool:
@@ -59,14 +66,32 @@ class DialogueUI:
     def _current_text(self) -> str:
         return self._current().get("text", "")
 
+    def _start_typing_sound(self):
+        if not self._typing_playing:
+            # loop while typing
+            self.typing_channel.play(self.dialogue_sfx, loops=-1)
+            self._typing_playing = True
+
+    def _stop_typing_sound(self):
+        if self._typing_playing:
+            self.typing_channel.stop()
+            self._typing_playing = False
+
     def _reset_typewriter_for_current_line(self):
         self._char_pos = 0.0
         self._shown_chars = 0
         self._line_done = False
 
+        # stop previous line sound (safety)
+        self._stop_typing_sound()
+
         text = self._current_text()
         if len(text) == 0:
             self._line_done = True
+            return
+
+        # start looping typing sound for this line
+        self._start_typing_sound()
 
     # -------------------------
     # ASSET LOADERS (cached)
@@ -79,10 +104,9 @@ class DialogueUI:
         return self.faces_cache[path]
 
     def _load_scene(self, path: str) -> pygame.Surface:
-        """Load + scale background to screen size, cached per path."""
         if path not in self.scene_cache:
             sw, sh = self.screen.get_size()
-            img = pygame.image.load(path).convert()  # background: no alpha needed
+            img = pygame.image.load(path).convert()
             img = pygame.transform.scale(img, (sw, sh))
             self.scene_cache[path] = img
         return self.scene_cache[path]
@@ -91,11 +115,11 @@ class DialogueUI:
     # UPDATE / INPUT
     # -------------------------
     def update(self, dt: float):
-        """Typewriter progression."""
         if not self.active:
             return
         if self.index >= len(self.lines):
             self.active = False
+            self._stop_typing_sound()
             return
         if self._line_done:
             return
@@ -107,16 +131,18 @@ class DialogueUI:
         if self._shown_chars >= len(text):
             self._shown_chars = len(text)
             self._line_done = True
+            # ✅ stop sound when fully typed
+            self._stop_typing_sound()
 
     def _advance(self):
         self.index += 1
         if self.index >= len(self.lines):
             self.active = False
+            self._stop_typing_sound()
             return
         self._reset_typewriter_for_current_line()
 
     def handle_event(self, event) -> bool:
-        """Return True if UI used the input (so player shouldn't attack)."""
         if not self.active:
             return False
 
@@ -129,15 +155,16 @@ class DialogueUI:
         if not proceed:
             return False
 
-        # 1) if text still typing => reveal instantly
+        # 1) if text still typing => reveal instantly AND stop typing sound
         if not self._line_done:
             text = self._current_text()
             self._shown_chars = len(text)
             self._char_pos = float(len(text))
             self._line_done = True
+            self._stop_typing_sound()
             return True
 
-        # 2) else go next line
+        # 2) else go next line (this will start typing sound again)
         self._advance()
         return True
 
@@ -170,11 +197,11 @@ class DialogueUI:
         cur = self._current()
         scene_path = cur.get("scene", None)
 
-        # ✅ update scene ONLY if this line provides one
+        # update scene ONLY if this line provides one
         if scene_path:
             self.current_scene_path = scene_path
 
-        # ✅ draw current scene if it exists (persist across lines)
+        # draw current scene if it exists (persist across lines)
         if self.current_scene_path:
             try:
                 bg = self._load_scene(self.current_scene_path)
@@ -184,7 +211,6 @@ class DialogueUI:
         else:
             self.screen.fill((10, 10, 10))
 
-        # 2) dialogue box
         sw, sh = self.screen.get_size()
         box_rect = pygame.Rect(
             self.margin,
@@ -205,18 +231,14 @@ class DialogueUI:
 
         # face
         tint = cur.get("tint", None)
-        
         face_x = box_rect.x + self.padding
         face_y = box_rect.y + self.padding
         if face_path:
             face = self._load_face(face_path)
-
             if tint is not None:
-                # tint = (0,0,0) => volledig zwart silhouette
                 tinted = face.copy()
                 tinted.fill(tint, special_flags=pygame.BLEND_RGBA_MULT)
                 face = tinted
-
             self.screen.blit(face, (face_x, face_y))
 
         # name + text
