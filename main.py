@@ -192,7 +192,13 @@ while running:
             state = "MAIN"
             settings_menu.visible = False
             
-        profile_menu.handle_event(event)
+        act = profile_menu.handle_event(event, player, config)
+        if act == "up_hp":
+            player.upgrade_hp()
+        elif act == "up_mana":
+            player.upgrade_mana()
+        elif act == "up_dmg":
+            player.upgrade_damage()
 
     # --------------------------------------------------
     # STATE: MAIN
@@ -251,6 +257,7 @@ while running:
         ui_block_input = True
     if any(r.collidepoint(mouse_pos) for r in menu_ui.rects):
         ui_block_input = True
+
 
     # menus die pauzeren
     paused = settings_menu.visible or profile_menu.visible
@@ -313,7 +320,8 @@ while running:
         for p in projectiles:
             for e in enemies:
                 if p.rect.colliderect(e.rect) and not getattr(e, "dead", False):
-                    e.take_damage(config.DAMAGE["book"])
+                    dmg = config.DAMAGE["book"] + getattr(player, "damage_bonus", 0)
+                    e.take_damage(dmg)
                     p.age = p.lifetime
 
         # loot
@@ -379,7 +387,7 @@ while running:
     menu_ui.draw()
     inventory_ui.draw(player, config)
     settings_menu.draw()
-    profile_menu.draw(player)
+    profile_menu.draw(player,config)
 
     if player.dead:
         text = font_big.render("YOU DIED", True, (255, 255, 255))

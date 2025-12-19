@@ -10,24 +10,42 @@ from entities.player_mana import ManaSystem
 
 class Player:
     def __init__(self, x: int, y: int, config: dict):
+        # -------------------------
+        # CORE STATE
+        # -------------------------
         self.facing_right = True
-        self.coins = 0
-        self.inventory = {} 
 
-        # input
+        # economy / inventory
+        self.coins = getattr(self, "coins", 0)      # als je ooit save/load doet
+        self.inventory = getattr(self, "inventory", {}) or {}
+
+        # upgrades / bonus stats
+        self.damage_bonus = getattr(self, "damage_bonus", 0)
+
+        # upgrade levels (voor cost scaling)
+        self.upg_hp_lvl = getattr(self, "upg_hp_lvl", 0)
+        self.upg_mana_lvl = getattr(self, "upg_mana_lvl", 0)
+        self.upg_dmg_lvl = getattr(self, "upg_dmg_lvl", 0)
+
+        # -------------------------
+        # BASE STATS (EERST zetten!)
+        # -------------------------
+        self.max_hp = int(config.get("hp", 10))
+        self.hp = int(getattr(self, "hp", self.max_hp))  # behoud hp als je later load
+
+        # -------------------------
+        # INPUT / ATTACK TIMING
+        # -------------------------
         self.attack_key_prev = False
         self.jump_key_prev = False
 
-        # attack timing
         self.attack_timer = 0.0
         self.attack_delay = 0.45
         self.attack_spawned = False
 
-        # stats
-        self.max_hp = config.get("hp", 10)
-        self.hp = self.max_hp
-
-        # systems
+        # -------------------------
+        # SYSTEMS
+        # -------------------------
         self.block = BlockSystem(
             block_chance=0.80,
             fail_stun=0.40,
@@ -35,13 +53,16 @@ class Player:
             shield_scale=0.1,
             pushback_force=300.0,
         )
+
         self.mana_sys = ManaSystem(
             max_mana=config.get("mana", 50),
             drain_run=6.0,
             regen=2.0,
         )
 
-        # feedback timers
+        # -------------------------
+        # FEEDBACK TIMERS
+        # -------------------------
         self.damage_timer = 0.0
         self.damage_flash_duration = 0.2
 
@@ -50,7 +71,7 @@ class Player:
         self.slow_multiplier = 0.4
 
         self.hurt_timer = 0.0
-        self.hurt_duration = 0.25
+        self.hurt_duration = 0.25  
 
         # pushback physics
         self.block_push_vel = 0.0
@@ -367,6 +388,53 @@ class Player:
         if self.inventory[item_id] <= 0:
             del self.inventory[item_id]
 
+        return True
+    
+    def can_afford(self, cost: int) -> bool:
+        return getattr(self, "coins", 0) >= int(cost)
+
+    def spend(self, cost: int) -> bool:
+        cost = int(cost)
+        if self.coins >= cost:
+            self.coins -= cost
+            return True
+        return False
+
+    def upgrade_costs(self):
+        # simpele scaling (tweak gerust)
+        hp_cost   = 25 + self.upg_hp_lvl   * 20
+        mana_cost = 25 + self.upg_mana_lvl * 20
+        dmg_cost  = 40 + self.upg_dmg_lvl  * 30
+        return hp_cost, mana_cost, dmg_cost
+
+    def upgrade_hp(self):
+        cost, _, _ = self.upgrade_costs()
+        if not self.spend(cost):
+            return False
+        self.upg_hp_lvl += 1
+        self.max_hp += 5
+        self.hp = min(self.max_hp, self.hp + 5)  # kleine heal bonus
+        return True
+
+    def upgrade_mana(self):
+        _, cost, _ = self.upgrade_costs()
+        if not self.spend(cost):
+            return False
+
+        self.upg_mana_lvl += 1
+
+        # ✅ mana via ManaSystem (NIET via player properties)
+        self.mana_sys.max_mana += 3
+        self.mana_sys.mana = min(self.mana_sys.max_mana, self.mana_sys.mana + 3)
+
+        return True
+
+    def upgrade_damage(self):
+        _, _, cost = self.upgrade_costs()
+        if not self.spend(cost):
+            return False
+        self.upg_dmg_lvl += 1
+        self.damage_bonus += 1
         return True
 
     def draw(self, screen: pygame.Surface):
