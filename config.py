@@ -47,22 +47,25 @@ WAVES = {
     
     2: {"pool": [{"type":"zombie","cfg_key":"ZOMBIE","weight":50},
                  {"type":"zombie2","cfg_key":"ZOMBIE2","weight":50}],
-        "max_enemies": 2,
+        "max_enemies": 3,
         "interval": (1.3, 2.0),
-        "total_spawns": 2,
+        "total_spawns": 4,
         "scene": "assets/Scenes/schoolyard.png", 
     },
     
 # skeleton lvls
-    3: {"pool": [{"type":"skeleton2","cfg_key":"SKELETON2","weight":100}],
-        "max_enemies": 2,
+    3: {"pool": [{"type":"skeleton2","cfg_key":"SKELETON2","weight":33.3},
+                 {"type":"zombie2","cfg_key":"ZOMBIE2","weight":33.3},
+                 {"type":"zombie","cfg_key":"ZOMBIE","weight":33.3}],
+        "max_enemies": 4,
         "interval": (1.1, 1.7),
-        "total_spawns": 3,
+        "total_spawns": 6,
         "scene": "assets/Scenes/schoolyard.png",
     },
     
-    4: {"pool": [{"type":"skeleton2","cfg_key":"SKELETON2","weight":70},
-                 {"type":"skeleton","cfg_key":"SKELETON","weight":30}],
+    4: {"pool": [{"type":"skeleton2","cfg_key":"SKELETON2","weight":35},
+                 {"type":"skeleton","cfg_key":"SKELETON","weight":35},
+                 {"type":"zombie2","cfg_key":"ZOMBIE2","weight":30}],
         "max_enemies": 3,
         "interval": (1.1, 1.7),
         "total_spawns": 5,
@@ -70,7 +73,9 @@ WAVES = {
     },
 
 # hellhound lvls    
-    5: {"pool": [{"type":"hellhound","cfg_key":"HELLHOUND","weight":100}],
+    5: {"pool": [{"type":"hellhound","cfg_key":"HELLHOUND","weight":20},
+                 {"type":"skeleton2","cfg_key":"SKELETON2","weight":40},
+                 {"type":"skeleton","cfg_key":"SKELETON","weight":40}],
         "max_enemies": 1,
         "interval": (1.1, 1.7),
         "total_spawns": 2,
