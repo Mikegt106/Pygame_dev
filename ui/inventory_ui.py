@@ -13,11 +13,11 @@ class InventoryUI:
         slide_speed: float = 16.0,
     ):
         self.screen = screen
-        self.slots = slots
-        self.scale = scale
-        self.bottom_margin = bottom_margin
+        self.slots = int(slots)
+        self.scale = float(scale)
+        self.bottom_margin = int(bottom_margin)
         self.spacing = int(spacing * scale)
-        self.slide_speed = slide_speed
+        self.slide_speed = float(slide_speed)
 
         self.visible = False
 
@@ -44,6 +44,13 @@ class InventoryUI:
         self.hidden_offset = self.label_h
         self.label_offset = [float(self.hidden_offset) for _ in range(self.slots)]
 
+        # fonts
+        self.font_small = pygame.font.SysFont(None, int(22 * scale))
+        self.font_count = pygame.font.SysFont(None, int(24 * scale))
+
+        # item image cache: item_id -> Surface
+        self._item_img_cache = {}
+
     # -------------------------
     def _layout(self):
         sw, sh = self.screen.get_size()
@@ -66,26 +73,21 @@ class InventoryUI:
 
     # -------------------------
     def is_hovered(self) -> bool:
-        """True als muis boven een slot zit (alleen relevant als visible)."""
         if not self.visible:
             return False
         mx, my = pygame.mouse.get_pos()
         return any(r.collidepoint((mx, my)) for r in self.rects)
 
     # -------------------------
-    def handle_event(self, event) -> bool:
-        """
-        Return True als inventory de input gebruikt (click consume).
-        (Later kan je hier slot-index teruggeven.)
-        """
+    def handle_event(self, event):
         if not self.visible:
-            return False
+            return None
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for r in self.rects:
+            for i, r in enumerate(self.rects):
                 if r.collidepoint(event.pos):
-                    return True
-        return False
+                    return i
+        return None
 
     # -------------------------
     def update(self, dt: float):
@@ -103,14 +105,95 @@ class InventoryUI:
             )
 
     # -------------------------
-    def draw(self):
+    def _get_hotbar_items(self, player, config):
+        inv = getattr(player, "inventory", {}) or {}
+        items = []
+        for item_id, count in inv.items():
+            if count <= 0:
+                continue
+            if item_id not in getattr(config, "ITEMS", {}):
+                continue
+            items.append((item_id, int(count)))
+            if len(items) >= self.slots:
+                break
+        return items
+
+    def _get_item_image(self, item_id: str, config):
+        if item_id in self._item_img_cache:
+            return self._item_img_cache[item_id]
+
+        item = config.ITEMS.get(item_id, {})
+        path = item.get("image")
+        if not path:
+            return None
+
+        img = pygame.image.load(path).convert_alpha()
+
+        # schaal naar box (subtiel kleiner)
+        max_w = int(self.box_w * 0.65)
+        max_h = int(self.box_h * 0.65)
+        iw, ih = img.get_size()
+        scale = min(max_w / iw, max_h / ih)
+        new_size = (max(1, int(iw * scale)), max(1, int(ih * scale)))
+        img = pygame.transform.scale(img, new_size)
+
+        self._item_img_cache[item_id] = img
+        return img
+
+    # -------------------------
+    def draw(self, player, config):
         if not self.visible:
             return
 
+        hotbar = self._get_hotbar_items(player, config)  # list[(id,count)]
+        slot_items = [None] * self.slots
+        for i, tup in enumerate(hotbar):
+            slot_items[i] = tup
+
+        mx, my = pygame.mouse.get_pos()
+
         for i, r in enumerate(self.rects):
-            # label zit BOVEN box, en schuift omhoog
+            # -------------------------
+            # ✅ HOVER LABEL terug (zonder tekst)
+            # -------------------------
             label_x = r.centerx - self.label_w // 2
             label_y = r.y - self.label_h + int(self.label_offset[i])
-
             self.screen.blit(self.label, (label_x, label_y))
+
+            # box
             self.screen.blit(self.box, r.topleft)
+
+            # item icon + count
+            if slot_items[i] is not None:
+                item_id, count = slot_items[i]
+
+                icon = self._get_item_image(item_id, config)
+                if icon:
+                    ix = r.centerx - icon.get_width() // 2
+                    iy = r.centery - icon.get_height() // 2
+                    self.screen.blit(icon, (ix, iy))
+
+                # stack count rechtsonder (alleen tonen als > 1)
+                if count > 1:
+                    text = str(count)
+                    cnt = self.font_count.render(text, True, (255, 255, 255))
+                    shadow = self.font_count.render(text, True, (0, 0, 0))
+
+                    pad_x = int(4 * self.scale)   
+                    pad_y = int(3.2 * self.scale)  
+                    cx = r.right - cnt.get_width() - pad_x
+                    cy = r.bottom - cnt.get_height() - pad_y
+
+                    self.screen.blit(shadow, (cx + 1, cy + 1))
+                    self.screen.blit(cnt, (cx, cy))
+
+            # hover border (optioneel)
+            if r.collidepoint((mx, my)):
+                pygame.draw.rect(self.screen, (255, 255, 255), r, 2, border_radius=8)
+
+    # -------------------------
+    def get_item_in_slot(self, slot_index: int, player, config):
+        hotbar = self._get_hotbar_items(player, config)
+        if 0 <= slot_index < len(hotbar):
+            return hotbar[slot_index][0]  # item_id
+        return None

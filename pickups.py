@@ -5,6 +5,15 @@ import pygame
 from assets import load_image
 
 
+def _scale_image(img: pygame.Surface, scale: float) -> pygame.Surface:
+    scale = float(scale)
+    if scale == 1.0:
+        return img
+    w, h = img.get_size()
+    nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
+    return pygame.transform.smoothscale(img, (nw, nh))
+
+
 # ==========================================================
 # BASE PICKUP (magnet + drop physics + bobbing)
 # ==========================================================
@@ -15,13 +24,14 @@ class BasePickup:
         y: float,
         image: pygame.Surface,
         *,
+        scale: float = 1.0,          # ✅ nieuw
         ground_y: int = 680,
         lifetime: float = 12.0,
         magnet_speed: float = 900.0,
         magnet_radius: int = 140,
         pickup_radius: int = 22,
     ):
-        self.image = image
+        self.image = _scale_image(image, scale)  # ✅ schaal hier
         self.rect = self.image.get_rect(center=(int(x), int(y)))
 
         # state
@@ -31,7 +41,9 @@ class BasePickup:
         # magnet
         self.magnet_speed = float(magnet_speed)
         self.magnet_radius = int(magnet_radius)
-        self.pickup_radius = int(pickup_radius)
+
+        # ✅ pickup radius mee laten schalen (voelt beter bij grote items)
+        self.pickup_radius = int(pickup_radius * float(scale))
         self.magnet_active = False
 
         # physics
@@ -167,10 +179,9 @@ class CoinPickup(BasePickup):
         else:
             img = CoinPickup.COIN_SMALL
 
-        super().__init__(x, y, img)
+        super().__init__(x, y, img)  # coins al geschaald via cached images
 
     def apply(self, player):
-        # coins toevoegen bij pickup
         player.coins = getattr(player, "coins", 0) + self.value
 
 
@@ -179,14 +190,15 @@ class CoinPickup(BasePickup):
 # ==========================================================
 class ItemPickup(BasePickup):
     def __init__(self, x: float, y: float, cfg: dict):
-        self.heal = int(cfg.get("heal", 0))
+        self.item_id = cfg["id"]          # bv "APPLE"
+        self.amount = int(cfg.get("amount", 1))
 
         img = pygame.image.load(cfg["image"]).convert_alpha()
-        # optioneel: schaal items wat groter
-        img = pygame.transform.scale(img, (img.get_width()*2, img.get_height()*2))
 
-        super().__init__(x, y, img)
+        # ✅ groter maken (tweakbaar per item via config: drop_scale)
+        drop_scale = float(cfg.get("drop_scale", 2.2))
+
+        super().__init__(x, y, img, scale=drop_scale)
 
     def apply(self, player):
-        if self.heal > 0:
-            player.hp = min(player.max_hp, player.hp + self.heal)
+        player.add_item(self.item_id, self.amount)

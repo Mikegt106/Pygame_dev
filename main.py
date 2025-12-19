@@ -173,9 +173,12 @@ while running:
             elif clicked == 2:
                 settings_menu.toggle()
 
-        if hasattr(inventory_ui, "handle_event"):
-            if inventory_ui.handle_event(event):
-                ui_used_click_this_frame = True
+        slot = inventory_ui.handle_event(event)
+        if slot is not None:
+            ui_used_click_this_frame = True
+            item_id = inventory_ui.get_item_in_slot(slot, player, config)
+            if item_id and hasattr(player, "use_item"):
+                player.use_item(item_id, config)
 
         action = settings_menu.handle_event(event)
         if action == "resume":
@@ -220,7 +223,7 @@ while running:
 
         statui.draw(screen)
         menu_ui.draw()
-        inventory_ui.draw()
+        inventory_ui.draw(player, config)
 
         fade_surface.set_alpha(int(fade_alpha))
         screen.blit(fade_surface, (0, 0))
@@ -368,7 +371,7 @@ while running:
     # UI boven alles
     statui.draw(screen)
     menu_ui.draw()
-    inventory_ui.draw()
+    inventory_ui.draw(player, config)
     settings_menu.draw()
 
     if player.dead:

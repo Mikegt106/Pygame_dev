@@ -12,6 +12,7 @@ class Player:
     def __init__(self, x: int, y: int, config: dict):
         self.facing_right = True
         self.coins = 0
+        self.inventory = {} 
 
         # input
         self.attack_key_prev = False
@@ -338,6 +339,35 @@ class Player:
             self.anim.play("dead", reset_if_same=True)
 
         return False
+    
+    def add_item(self, item_id: str, amount: int = 1) -> bool:
+        if not hasattr(self, "inventory") or self.inventory is None:
+            self.inventory = {}
+
+        self.inventory[item_id] = self.inventory.get(item_id, 0) + int(amount)
+        return True
+
+    def use_item(self, item_id: str, config):
+        if not hasattr(self, "inventory"):
+            return False
+        if self.inventory.get(item_id, 0) <= 0:
+            return False
+
+        item = config.ITEMS.get(item_id)
+        if not item:
+            return False
+
+        # apply effect
+        heal = int(item.get("heal", 0))
+        if heal > 0:
+            self.hp = min(self.max_hp, self.hp + heal)
+
+        # consume
+        self.inventory[item_id] -= 1
+        if self.inventory[item_id] <= 0:
+            del self.inventory[item_id]
+
+        return True
 
     def draw(self, screen: pygame.Surface):
         img = self.anim.get_image(self.facing_right)

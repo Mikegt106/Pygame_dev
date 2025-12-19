@@ -28,9 +28,7 @@ class LootSystem:
 
         value = random.randint(vmin, vmax)
         if value > 0:
-            pickups.append(
-                CoinPickup(enemy.rect.centerx, enemy.rect.centery, value=value)
-            )
+            pickups.append(CoinPickup(enemy.rect.centerx, enemy.rect.centery, value=value))
 
         # ==========================
         # ITEMS (HP regen)
@@ -39,19 +37,35 @@ class LootSystem:
         if random.random() > item_chance:
             return
 
-        items = config.ITEMS
-        if not items:
+        items = getattr(config, "ITEMS", None)
+        if not isinstance(items, dict) or len(items) == 0:
             return
 
         # enemy override weights, anders default uit config.ITEMS["..."]["weight"]
         w_override = loot_cfg.get("item_weights", None)
 
+        names = []
+        weights = []
+
         if isinstance(w_override, dict) and len(w_override) > 0:
-            names = [k for k in w_override.keys() if k in items]
-            weights = [w_override[k] for k in names]
+            # alleen items die echt bestaan + weight > 0
+            for k, w in w_override.items():
+                if k in items:
+                    w = float(w)
+                    if w > 0:
+                        names.append(k)
+                        weights.append(w)
         else:
-            names = list(items.keys())
-            weights = [items[k].get("weight", 1) for k in names]
+            # defaults uit ITEMS
+            for k, cfg in items.items():
+                w = float(cfg.get("weight", 1))
+                if w > 0:
+                    names.append(k)
+                    weights.append(w)
+
+        # guard: 
+        if not names or not weights:
+            return
 
         choice = random.choices(names, weights=weights, k=1)[0]
         cfg = items[choice]

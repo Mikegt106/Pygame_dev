@@ -130,13 +130,17 @@ DAMAGE = {
 
 ITEMS = {
     "apple": {
+        "id": "apple",
+        "name": "Apple",
         "image": "assets/Items/Apple.png",
-        "heal": 15,
-        "weight": 70,   # drop chance
+        "heal": 10,
+        "stack_limit": 99,
     },
     "hp_potion": {
+        "id": "hp_potion",
+        "name": "HP Potion",
         "image": "assets/Items/HP_potion.png",
-        "heal": 40,
-        "weight": 30,
+        "heal": 35,
+        "stack_limit": 99,
     },
 }
