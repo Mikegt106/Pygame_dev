@@ -9,6 +9,7 @@ from spawner import EnemySpawner
 from wave_system import WaveSystem
 from loot_system import LootSystem
 from ui.menu_ui import MenuUI
+from ui.inventory_ui import InventoryUI
 
 pygame.init()
 
@@ -22,8 +23,9 @@ clock = pygame.time.Clock()
 WORLD_WIDTH = 6000
 
 statui = StatBarUI()
-menu_ui = MenuUI(screen, scale=1.6)
-loot_sys = LootSystem(coins_min=0, coins_max=4)
+menu_ui = MenuUI(screen)
+inventory_ui = InventoryUI(screen)
+loot_sys = LootSystem()
 
 # --------------------------------------------------
 # SPAWNER (wordt per wave aangepast)
@@ -77,6 +79,7 @@ while running:
         
         clicked = menu_ui.handle_event(event)
         if clicked == 0:
+            inventory_ui.toggle()
             print("Backpack clicked")
         elif clicked == 1:
             print("Profile clicked")
@@ -199,9 +202,6 @@ while running:
         rect = toast.get_rect(center=(1280 // 2, 120))
         screen.blit(toast, rect)
 
-    statui.draw(screen)
-    menu_ui.update()
-    menu_ui.draw()
     player.draw(screen)
 
     for e in enemies:
@@ -216,6 +216,13 @@ while running:
                 
     coin_text = font_small.render(f"COINS: {getattr(player, 'coins', 0)}", True, (255, 255, 0))
     screen.blit(coin_text, (100, 105))
+    
+    # UI tekenen
+    statui.draw(screen)
+    menu_ui.update()
+    menu_ui.draw()
+    inventory_ui.update(dt)
+    inventory_ui.draw()
 
     if player.dead:
         text = font_big.render("YOU DIED", True, (255, 255, 255))
