@@ -10,14 +10,28 @@ from wave_system import WaveSystem
 from loot_system import LootSystem
 from ui.menu_ui import MenuUI
 from ui.inventory_ui import InventoryUI
+from ui.main_screen import MainScreen
 
 pygame.init()
 
+#----------------------------------
+# BACKGROUND MUSIC
+#----------------------------------
+pygame.mixer.init()     
+pygame.mixer.music.load("assets/Sounds/bg_music.mp3") 
+pygame.mixer.music.set_volume(0.35)  # 0.0 - 1.0
+pygame.mixer.music.play(-1)  # -1 = loop forever
+
+#----------------------------------
+# FONTS MANAGEMENT
+#----------------------------------
 font = pygame.font.SysFont(None, 36)
 font_big = pygame.font.SysFont(None, 96)
 font_small = pygame.font.SysFont(None, 24)
 
 screen = pygame.display.set_mode((1280, 720))
+main_screen = MainScreen(screen)
+state = "MAIN" 
 clock = pygame.time.Clock()
 
 WORLD_WIDTH = 6000
@@ -58,37 +72,22 @@ while running:
     keys = pygame.key.get_pressed()
 
     # --------------------------------------------------
-    # UI UPDATE (hover states)
-    # --------------------------------------------------
-    menu_ui.update()
-    inventory_ui.update(dt)
-
-    # --------------------------------------------------
-    # UI BLOCK INPUT (per frame)
-    # - blokkeer ENKEL wanneer je echt over UI hovert
-    # - inventory open mag, maar buiten de slots moet je kunnen attacken
-    # --------------------------------------------------
-    mouse_pos = pygame.mouse.get_pos()
-    ui_block_input = False
-
-    # hover over inventory slots
-    if inventory_ui.visible and any(r.collidepoint(mouse_pos) for r in inventory_ui.rects):
-        ui_block_input = True
-
-    # hover over menu buttons
-    if any(r.collidepoint(mouse_pos) for r in menu_ui.rects):
-        ui_block_input = True
-
-    # als je deze frame op UI klikt, blokkeer ook (zodat UI-click nooit attack triggert)
-    ui_used_click_this_frame = False
-
-    # --------------------------------------------------
     # EVENTS
     # --------------------------------------------------
+    ui_used_click_this_frame = False
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
+        # --- MAIN SCREEN ---
+        if state == "MAIN":
+            action = main_screen.handle_event(event)
+            if action == "PLAY":
+                state = "PLAY"
+            continue  # blijf in main screen event handling
+
+        # --- IN-GAME EVENTS ---
         if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
             player, projectiles, enemies, pickups = reset_game()
 
@@ -104,10 +103,36 @@ while running:
             elif clicked == 2:
                 print("Settings clicked")
 
-        # (optioneel) inventory events (als je later clicks toevoegt)
         if hasattr(inventory_ui, "handle_event"):
             if inventory_ui.handle_event(event):
                 ui_used_click_this_frame = True
+
+    # --------------------------------------------------
+    # MAIN SCREEN DRAW + STOP GAME LOOP
+    # --------------------------------------------------
+    if state == "MAIN":
+        main_screen.update(dt)
+        main_screen.draw()
+        pygame.display.flip()
+        continue
+
+    # --------------------------------------------------
+    # UI UPDATE (hover states)
+    # --------------------------------------------------
+    menu_ui.update()
+    inventory_ui.update(dt)
+
+    # --------------------------------------------------
+    # UI BLOCK INPUT (per frame)
+    # --------------------------------------------------
+    mouse_pos = pygame.mouse.get_pos()
+    ui_block_input = False
+
+    if inventory_ui.visible and any(r.collidepoint(mouse_pos) for r in inventory_ui.rects):
+        ui_block_input = True
+
+    if any(r.collidepoint(mouse_pos) for r in menu_ui.rects):
+        ui_block_input = True
 
     ui_block_input = ui_block_input or ui_used_click_this_frame
 
