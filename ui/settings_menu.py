@@ -10,14 +10,21 @@ class SettingsMenu:
         # TWEAKS
         # =========================
         self.font_size = 35
-        self.padding_x = 60      # links/rechts padding rond tekst
-        self.padding_y = 28      # boven/onder padding rond tekst
-        self.gap = 26            # ruimte tussen knoppen
+        self.padding_x = 60
+        self.padding_y = 28
+        self.gap = 26
         self.menu_offset = (0, 0)
 
         # highlight groter dan button
         self.hl_pad_x = 20
         self.hl_pad_y = 12
+
+        # =========================
+        # SFX
+        # =========================
+        self.hover_sfx = pygame.mixer.Sound("assets/Sounds/hover.wav")
+        self.hover_sfx.set_volume(0.5)
+        self._last_hover = None  # <--- belangrijk
 
         # =========================
         # LOAD RAW ASSETS
@@ -76,6 +83,8 @@ class SettingsMenu:
 
     def toggle(self):
         self.visible = not self.visible
+        if not self.visible:
+            self._last_hover = None
 
     def handle_event(self, event):
         if not self.visible:
@@ -83,6 +92,7 @@ class SettingsMenu:
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.visible = False
+            self._last_hover = None
             return "resume"
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -104,11 +114,24 @@ class SettingsMenu:
 
         mx, my = pygame.mouse.get_pos()
 
-        for it in self.items:
+        # -------- hover detect + sound (hover-enter) --------
+        hovered = None
+        for idx, it in enumerate(self.items):
+            if it["rect"].collidepoint((mx, my)):
+                hovered = idx
+                break
+
+        if hovered is not None and hovered != self._last_hover:
+            self.hover_sfx.play()
+
+        self._last_hover = hovered
+        # ----------------------------------------------------
+
+        for idx, it in enumerate(self.items):
             r = it["rect"]
 
             # highlight onder button (groter + offset)
-            if r.collidepoint((mx, my)):
+            if idx == hovered:
                 self.screen.blit(self.hl, (r.x - self.hl_pad_x, r.y - self.hl_pad_y))
 
             # button bovenop
