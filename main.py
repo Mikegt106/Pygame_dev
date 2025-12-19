@@ -27,11 +27,8 @@ menu_ui = MenuUI(screen)
 inventory_ui = InventoryUI(screen)
 loot_sys = LootSystem()
 
-# --------------------------------------------------
-# SPAWNER (wordt per wave aangepast)
-# --------------------------------------------------
 spawner = EnemySpawner(
-    pool=config.ENEMY_POOL,   # startpool (overschreven door waves)
+    pool=config.ENEMY_POOL,
     cfg_module=config,
     spawn_y=680,
     interval_min=1.2,
@@ -39,33 +36,51 @@ spawner = EnemySpawner(
     max_enemies=6,
 )
 
-# --------------------------------------------------
-# WAVE SYSTEM
-# --------------------------------------------------
-wave_sys = WaveSystem(
-    waves=config.WAVES,
-    break_time=4.0
-)
+wave_sys = WaveSystem(waves=config.WAVES, break_time=4.0)
 wave_sys.start()
 
-# --------------------------------------------------
-# RESET
-# --------------------------------------------------
+
 def reset_game():
     spawner.reset()
     wave_sys.start()
-
     player = Player(640, 680, config.PLAYER)
     projectiles = []
     enemies = []
     pickups = []
     return player, projectiles, enemies, pickups
 
+
 player, projectiles, enemies, pickups = reset_game()
 
 running = True
 while running:
     dt = clock.tick(60) / 1000.0
+    keys = pygame.key.get_pressed()
+
+    # --------------------------------------------------
+    # UI UPDATE (hover states)
+    # --------------------------------------------------
+    menu_ui.update()
+    inventory_ui.update(dt)
+
+    # --------------------------------------------------
+    # UI BLOCK INPUT (per frame)
+    # - blokkeer ENKEL wanneer je echt over UI hovert
+    # - inventory open mag, maar buiten de slots moet je kunnen attacken
+    # --------------------------------------------------
+    mouse_pos = pygame.mouse.get_pos()
+    ui_block_input = False
+
+    # hover over inventory slots
+    if inventory_ui.visible and any(r.collidepoint(mouse_pos) for r in inventory_ui.rects):
+        ui_block_input = True
+
+    # hover over menu buttons
+    if any(r.collidepoint(mouse_pos) for r in menu_ui.rects):
+        ui_block_input = True
+
+    # als je deze frame op UI klikt, blokkeer ook (zodat UI-click nooit attack triggert)
+    ui_used_click_this_frame = False
 
     # --------------------------------------------------
     # EVENTS
@@ -75,31 +90,39 @@ while running:
             running = False
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-            player, projectiles, enemies, pickups = reset_game()  
-        
-        clicked = menu_ui.handle_event(event)
-        if clicked == 0:
-            inventory_ui.toggle()
-            print("Backpack clicked")
-        elif clicked == 1:
-            print("Profile clicked")
-        elif clicked == 2:
-            print("Settings clicked")
+            player, projectiles, enemies, pickups = reset_game()
 
-    keys = pygame.key.get_pressed()
+        used_ui, clicked = menu_ui.handle_event(event)
+        if used_ui:
+            ui_used_click_this_frame = True
+
+            if clicked == 0:
+                inventory_ui.toggle()
+                print("Backpack clicked")
+            elif clicked == 1:
+                print("Profile clicked")
+            elif clicked == 2:
+                print("Settings clicked")
+
+        # (optioneel) inventory events (als je later clicks toevoegt)
+        if hasattr(inventory_ui, "handle_event"):
+            if inventory_ui.handle_event(event):
+                ui_used_click_this_frame = True
+
+    ui_block_input = ui_block_input or ui_used_click_this_frame
 
     # --------------------------------------------------
-    # WAVE UPDATE (stuurt spawner)
+    # WAVE UPDATE
     # --------------------------------------------------
     wave_sys.update(dt, spawner, enemies)
 
     # --------------------------------------------------
-    # PLAYER UPDATE (ALTIJD)
+    # PLAYER UPDATE (met UI block)
     # --------------------------------------------------
-    player.update(keys, dt, projectiles, config.PROJECTILES)
+    player.update(keys, dt, projectiles, config.PROJECTILES, ui_block_input)
 
     # --------------------------------------------------
-    # SPAWN (max 1x per frame)
+    # SPAWN
     # --------------------------------------------------
     if (not player.dead) and wave_sys.can_spawn():
         before = len(enemies)
@@ -109,31 +132,26 @@ while running:
             wave_sys.on_spawned(spawned_now)
 
     # --------------------------------------------------
-    # ENEMIES UPDATE
+    # ENEMIES / PROJECTILES
     # --------------------------------------------------
     for e in enemies:
         e.update(dt, player)
 
-    # --------------------------------------------------
-    # PROJECTILES UPDATE
-    # --------------------------------------------------
     for p in projectiles:
         p.update(dt)
 
     # --------------------------------------------------
-    # PICKUPS UPDATE
+    # PICKUPS
     # --------------------------------------------------
     for c in pickups:
         was_collected = getattr(c, "collected", False)
-
-        # coin beslist zelf magnet + collect
         c.update(dt, player.rect.midbottom)
 
         if (not was_collected) and getattr(c, "collected", False):
             player.coins = getattr(player, "coins", 0) + getattr(c, "value", 1)
 
     # --------------------------------------------------
-    # COLLISIONS (projectiles -> enemies)
+    # COLLISIONS
     # --------------------------------------------------
     for p in projectiles:
         for e in enemies:
@@ -142,14 +160,14 @@ while running:
                 p.age = p.lifetime
 
     # --------------------------------------------------
-    # LOOT DROPS (enemy net gestorven) ✅
+    # LOOT
     # --------------------------------------------------
     for e in enemies:
         if getattr(e, "dead", False) and not getattr(e, "_loot_dropped", False):
             loot_sys.on_enemy_death(e, pickups)
 
     # --------------------------------------------------
-    # CLEANUP ✅
+    # CLEANUP
     # --------------------------------------------------
     projectiles = [p for p in projectiles if not p.is_dead()]
     enemies = [e for e in enemies if not getattr(e, "remove", False)]
@@ -174,27 +192,13 @@ while running:
     # --------------------------------------------------
     screen.fill((20, 20, 20))
 
-    # --- Wave label ---
-    wave_text = font.render(
-        f"WAVE {wave_sys.wave} - {wave_sys.state}",
-        True,
-        (255, 255, 255),
-    )
+    wave_text = font.render(f"WAVE {wave_sys.wave} - {wave_sys.state}", True, (255, 255, 255))
     screen.blit(wave_text, (100, 10))
 
-    # --- Enemies left ---
-    remaining = max(
-        0,
-        (wave_sys.spawn_limit - wave_sys.spawned) + len(enemies),
-    )
-    left_text = font_small.render(
-        f"ENEMIES LEFT: {remaining}",
-        True,
-        (255, 255, 255),
-    )
+    remaining = max(0, (wave_sys.spawn_limit - wave_sys.spawned) + len(enemies))
+    left_text = font_small.render(f"ENEMIES LEFT: {remaining}", True, (255, 255, 255))
     screen.blit(left_text, (100, 80))
 
-    # --- Wave cleared toast ---
     if wave_sys.toast_text:
         toast = font_big.render(wave_sys.toast_text, True, (255, 255, 255))
         toast = toast.convert_alpha()
@@ -210,18 +214,15 @@ while running:
     for p in projectiles:
         p.draw(screen)
 
-    # pickups tekenen
     for c in pickups:
         c.draw(screen)
-                
+
     coin_text = font_small.render(f"COINS: {getattr(player, 'coins', 0)}", True, (255, 255, 0))
     screen.blit(coin_text, (100, 105))
-    
-    # UI tekenen
+
+    # UI als laatste tekenen (boven alles)
     statui.draw(screen)
-    menu_ui.update()
     menu_ui.draw()
-    inventory_ui.update(dt)
     inventory_ui.draw()
 
     if player.dead:

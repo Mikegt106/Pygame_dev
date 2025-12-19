@@ -84,8 +84,8 @@ class MenuUI:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for i, r in enumerate(self.rects):
                 if r.collidepoint(event.pos):
-                    return i
-        return None
+                    return True, i   # UI gebruikte de click
+        return False, None
 
     # -------------------------
     def draw(self):

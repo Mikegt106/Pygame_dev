@@ -7,7 +7,7 @@ class InventoryUI:
         self,
         screen: pygame.Surface,
         slots: int = 6,
-        scale: float = 1.7,        
+        scale: float = 1.7,
         bottom_margin: int = 20,
         spacing: int = 6,
         slide_speed: float = 16.0,
@@ -65,6 +65,29 @@ class InventoryUI:
                 self.label_offset[i] = float(self.hidden_offset)
 
     # -------------------------
+    def is_hovered(self) -> bool:
+        """True als muis boven een slot zit (alleen relevant als visible)."""
+        if not self.visible:
+            return False
+        mx, my = pygame.mouse.get_pos()
+        return any(r.collidepoint((mx, my)) for r in self.rects)
+
+    # -------------------------
+    def handle_event(self, event) -> bool:
+        """
+        Return True als inventory de input gebruikt (click consume).
+        (Later kan je hier slot-index teruggeven.)
+        """
+        if not self.visible:
+            return False
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for r in self.rects:
+                if r.collidepoint(event.pos):
+                    return True
+        return False
+
+    # -------------------------
     def update(self, dt: float):
         if not self.visible:
             return
@@ -75,7 +98,9 @@ class InventoryUI:
             hovering = r.collidepoint((mx, my))
             target = 0.0 if hovering else float(self.hidden_offset)
 
-            self.label_offset[i] += (target - self.label_offset[i]) * min(1.0, self.slide_speed * dt)
+            self.label_offset[i] += (target - self.label_offset[i]) * min(
+                1.0, self.slide_speed * dt
+            )
 
     # -------------------------
     def draw(self):
@@ -83,7 +108,7 @@ class InventoryUI:
             return
 
         for i, r in enumerate(self.rects):
-            # 🔑 label zit BOVEN box, en schuift omhoog
+            # label zit BOVEN box, en schuift omhoog
             label_x = r.centerx - self.label_w // 2
             label_y = r.y - self.label_h + int(self.label_offset[i])
 

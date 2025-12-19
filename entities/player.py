@@ -118,12 +118,10 @@ class Player:
     def mana_regening(self):
         return self.mana_sys.regening
 
-    def update(self, keys, dt: float, projectiles: list, projectile_cfg: dict):
-        # block system update
-        protecting_key = keys[pygame.K_e]
-        self.block.update(dt, protecting_key)
-
-        # timers
+    def update(self, keys, dt, projectiles, PROJECTILES, ui_block_input=False):
+        # ----------------------
+        # TIMERS
+        # ----------------------
         speed_mult = 1.0
         if self.slow_timer > 0:
             self.slow_timer = max(0.0, self.slow_timer - dt)
@@ -134,6 +132,28 @@ class Player:
 
         if self.hurt_timer > 0:
             self.hurt_timer = max(0.0, self.hurt_timer - dt)
+
+        # ----------------------
+        # READ INPUTS ONCE
+        # ----------------------
+        mouse_buttons = pygame.mouse.get_pressed()
+
+        # ---- BLOCK INPUT ----
+        block_now = (mouse_buttons[2] or keys[pygame.K_e]) and (not ui_block_input)
+        
+        if hasattr(self.block, "set_blocking"):
+            self.block.set_blocking(block_now)
+        else:
+            self.block.blocking = block_now
+            
+        # BlockSystem per frame updaten 
+        if hasattr(self.block, "update"):
+            self.block.update(dt, block_now)
+
+        # ---- ATTACK INPUT ----
+        attack_now = (keys[pygame.K_RETURN] or (mouse_buttons[0] and not ui_block_input))
+        attack_pressed = attack_now and not self.attack_key_prev
+        self.attack_key_prev = attack_now
 
         # ----------------------
         # JUMP INPUT
@@ -154,8 +174,6 @@ class Player:
         if can_start_jump:
             self.vel_y = -self.jump_strength
             self.on_ground = False
-
-            # ✅ lock jump anim until finished + landed
             if "jump" in self.anim.animations:
                 self.jump_anim_lock = True
                 self.anim.play("jump", reset_if_same=True)
@@ -185,6 +203,14 @@ class Player:
         # PRIORITY STATES
         # ----------------------
         if self.dead:
+            # force release block zodat shield niet kan blijven hangen
+            if hasattr(self.block, "set_blocking"):
+                self.block.set_blocking(False)
+            else:
+                self.block.blocking = False
+            if hasattr(self.block, "update"):
+                self.block.update(dt, block_now)
+
             self.jump_anim_lock = False
             self.anim.play("dead")
             self.anim.update(dt)
@@ -192,6 +218,14 @@ class Player:
             return
 
         if self.hurt_timer > 0:
+            # force release block zodat shield niet kan blijven hangen
+            if hasattr(self.block, "set_blocking"):
+                self.block.set_blocking(False)
+            else:
+                self.block.blocking = False
+            if hasattr(self.block, "update"):
+                self.block.update(dt, block_now)
+
             self.jump_anim_lock = False
             self.anim.play("hurt")
             self.anim.update(dt)
@@ -199,13 +233,8 @@ class Player:
             return
 
         # ----------------------
-        # INPUTS (attack/move)
+        # MOVEMENT
         # ----------------------
-        mouse_buttons = pygame.mouse.get_pressed()
-        attack_now = keys[pygame.K_RETURN] or mouse_buttons[0]
-        attack_pressed = attack_now and not self.attack_key_prev
-        self.attack_key_prev = attack_now
-
         protecting = self.block.blocking
         can_move = (self.anim.state != "attack") and (not protecting)
 
@@ -238,7 +267,7 @@ class Player:
                 direction = 1 if self.facing_right else -1
                 spawn_x = self.rect.centerx + (30 * direction)
                 spawn_y = self.rect.centery + 50
-                projectiles.append(BookProjectile(spawn_x, spawn_y, direction, projectile_cfg["book"]))
+                projectiles.append(BookProjectile(spawn_x, spawn_y, direction, PROJECTILES["book"]))
                 self.attack_spawned = True
 
             if self.anim.finished:
@@ -254,19 +283,15 @@ class Player:
                 self.anim.play("protect")
                 self.anim.update(dt)
 
-            # ✅ jump lock krijgt voorrang op ALLES (ook al ben je al geland)
             elif self.jump_anim_lock and ("jump" in self.anim.animations):
                 self.anim.play("jump")  # niet resetten
                 self.anim.update(dt)
 
-                # unlock pas als anim klaar is én je op de grond staat
                 if self.anim.finished and self.on_ground:
                     self.jump_anim_lock = False
 
-            # (optioneel) als je ooit een "fall" anim wil: hier toevoegen
             elif not self.on_ground:
                 if "jump" in self.anim.animations:
-                    # tijdens airtime (zonder lock) toch jump tonen
                     self.anim.play("jump")
                 else:
                     self.anim.play("idle")
