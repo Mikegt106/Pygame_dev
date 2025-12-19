@@ -204,10 +204,19 @@ class DialogueUI:
         shown_text = full_text[: self._shown_chars]
 
         # face
+        tint = cur.get("tint", None)
+        
         face_x = box_rect.x + self.padding
         face_y = box_rect.y + self.padding
         if face_path:
             face = self._load_face(face_path)
+
+            if tint is not None:
+                # tint = (0,0,0) => volledig zwart silhouette
+                tinted = face.copy()
+                tinted.fill(tint, special_flags=pygame.BLEND_RGBA_MULT)
+                face = tinted
+
             self.screen.blit(face, (face_x, face_y))
 
         # name + text

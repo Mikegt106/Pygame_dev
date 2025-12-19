@@ -1,81 +1,114 @@
 # dialogue/intro.py
 
 def get_intro_lines():
-    F = "assets/Schoolgirl/Faces/"
-    S = "assets/Scenes/"
+    SG = "assets/Dialogue/Faces/Schoolgirl/"
+    MY = "assets/Dialogue/Faces/Mysterious/"
+    SCENE = "assets/Scenes/intro_hallway.png"
+
+    Darkout = (0,0,0)
+
 
     return [
+        # --- Wake up ---
         {
-            "scene": S + "intro_hallway.png",
-            "name": "Schoolgirl",
-            "face": F + "Calm.png",
-            "text": "…So you really woke up here."
+            "name": "ME",
+            "face": SG + "Awkwardness.png",
+            "scene": SCENE,
+            "text": "…Where am I?"
         },
 
         {
-            "scene": S + "intro_hallway.png",
-            "name": "Schoolgirl",
-            "face": F + "Indifference.png",
-            "text": "Interesting. Most of them stay asleep."
+            "name": "???",
+            "face": MY + "Calm.png",
+            "scene": SCENE,
+            "tint": Darkout,
+            "text": "Awake already."
         },
 
         {
-            "name": "Schoolgirl",
-            "face": F + "Smile.png",
-            "text": "Relax. If this were a dream, you'd already be gone."
+            "name": "ME",
+            "face": SG + "Calm.png",
+            "scene": SCENE,
+            "text": "No… I was in class. Then— lights out."
         },
 
         {
-            "name": "Schoolgirl",
-            "face": F + "Calm.png",
-            "text": "This place used to be loud. Bells. Footsteps. Voices."
+            "name": "???",
+            "face": MY + "Special.png",
+            "scene": SCENE,
+            "tint": Darkout,
+            "text": "Don’t waste time trying to remember. Not yet."
+        },
+
+        # --- Discomfort ---
+        {
+            "name": "ME",
+            "face": SG + "Indifference.png",
+            "scene": SCENE,
+            "text": "My body feels heavy… like I’m stuck in a bad dream."
         },
 
         {
-            "name": "Schoolgirl",
-            "face": F + "Awkwardness.png",
-            "text": "Now it only responds to movement… and fear."
+            "name": "???",
+            "face": MY + "Aggression.png",
+            "scene": SCENE,
+            "tint": Darkout,
+            "text": "You are. But dreams still bite."
+        },
+
+        # --- Regaining control ---
+        {
+            "name": "ME",
+            "face": SG + "Calm.png",
+            "scene": SCENE,
+            "text": "Okay… breathe. Focus."
         },
 
         {
-            "name": "Schoolgirl",
-            "face": F + "Indifference.png",
-            "text": "They will come in waves. They always do."
+            "name": "???",
+            "face": MY + "Talk.png",
+            "scene": SCENE,
+            "tint": Darkout,
+            "text": "Waves will come. You survive, you learn."
         },
 
         {
-            "name": "Schoolgirl",
-            "face": F + "Passive aggression.png",
-            "text": "Timing matters more than strength. Swing wildly and you won’t last."
+            "name": "ME",
+            "face": SG + "Passion.png",
+            "scene": SCENE,
+            "text": "So it’s that kind of place… Fine."
+        },
+
+        # --- Rules / threat ---
+        {
+            "name": "???",
+            "face": MY + "Smile.png",
+            "scene": SCENE,
+            "tint": Darkout,
+            "text": "Good. Then listen."
         },
 
         {
-            "name": "Schoolgirl",
-            "face": F + "Calm.png",
-            "text": "Defend when you must. Hesitate when you can."
+            "name": "???",
+            "face": MY + "Special.png",
+            "scene": SCENE,
+            "tint": Darkout,
+            "text": "Attack with LEFT CLICK or ENTER. Block with RIGHT CLICK or E."
         },
 
         {
-            "name": "Schoolgirl",
-            "face": F + "Passion.png",
-            "text": "Coins fall from mistakes. Collect them. Mistakes have value here."
+            "name": "ME",
+            "face": SG + "Smile.png",
+            "scene": SCENE,
+            "text": "Got it."
         },
 
+        # --- Final hook ---
         {
-            "name": "Schoolgirl",
-            "face": F + "Smile.png",
-            "text": "Don’t bother looking for exits."
-        },
-
-        {
-            "name": "Schoolgirl",
-            "face": F + "Calm.png",
-            "text": "When the bell rang… no one left."
-        },
-
-        {
-            "name": "Schoolgirl",
-            "face": F + "Passion.png",
-            "text": "Stay alive long enough… and maybe you’ll understand why."
+            "name": "???",
+            "face": MY + "Special.png",
+            "scene": SCENE,
+            "tint": Darkout,
+            "text": "When the bell rings… don’t look back."
         },
     ]
