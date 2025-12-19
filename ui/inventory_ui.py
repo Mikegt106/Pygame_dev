@@ -1,6 +1,9 @@
 # ui/inventory_ui.py
 import pygame
 
+# ---------- HOVER SOUND ----------
+HOVER_SOUND = pygame.mixer.Sound("assets/Sounds/hover.wav")
+HOVER_SOUND.set_volume(0.5)
 
 class InventoryUI:
     def __init__(
@@ -20,6 +23,7 @@ class InventoryUI:
         self.slide_speed = float(slide_speed)
 
         self.visible = False
+        self._last_hover_index = None
 
         # ---------- LOAD ASSETS ----------
         self.box = pygame.image.load("assets/Inventory/HotkeyBox.png").convert_alpha()
@@ -92,9 +96,11 @@ class InventoryUI:
     # -------------------------
     def update(self, dt: float):
         if not self.visible:
+            self._last_hover_index = None
             return
 
         mx, my = pygame.mouse.get_pos()
+        current_hover = None
 
         for i, r in enumerate(self.rects):
             hovering = r.collidepoint((mx, my))
@@ -103,6 +109,15 @@ class InventoryUI:
             self.label_offset[i] += (target - self.label_offset[i]) * min(
                 1.0, self.slide_speed * dt
             )
+
+            if hovering:
+                current_hover = i
+
+        # 🔊 HOVER SOUND (alleen bij nieuw slot)
+        if current_hover is not None and current_hover != self._last_hover_index:
+            HOVER_SOUND.play()
+
+        self._last_hover_index = current_hover
 
     # -------------------------
     def _get_hotbar_items(self, player, config):

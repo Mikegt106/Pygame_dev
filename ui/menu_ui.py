@@ -1,6 +1,9 @@
 # ui/menu_ui.py
 import pygame
 
+# ---------- HOVER SOUND ----------
+HOVER_SOUND = pygame.mixer.Sound("assets/Sounds/hover.wav")
+HOVER_SOUND.set_volume(0.5)
 
 class MenuUI:
     def __init__(self, screen: pygame.Surface, scale: float = 1.6, margin: int = 24, spacing: int = 10):
@@ -11,6 +14,7 @@ class MenuUI:
 
         # hover state
         self.hover_index = None
+        self._last_hover = None
 
         # -------------------------
         # load + scale assets
@@ -73,11 +77,19 @@ class MenuUI:
     # -------------------------
     def update(self):
         mx, my = pygame.mouse.get_pos()
-        self.hover_index = None
+
+        new_hover = None
         for i, r in enumerate(self.rects):
             if r.collidepoint((mx, my)):
-                self.hover_index = i
+                new_hover = i
                 break
+
+        # 🔊 play sound only when hover ENTERS a new button
+        if new_hover is not None and new_hover != self._last_hover:
+            HOVER_SOUND.play()
+
+        self.hover_index = new_hover
+        self._last_hover = new_hover
 
     # -------------------------
     def handle_event(self, event):
