@@ -11,6 +11,8 @@ from loot_system import LootSystem
 from ui.menu_ui import MenuUI
 from ui.inventory_ui import InventoryUI
 from ui.main_screen import MainScreen
+from dialogue.intro import get_intro_lines
+from ui.dialogue_ui import DialogueUI
 
 pygame.init()
 
@@ -36,10 +38,19 @@ clock = pygame.time.Clock()
 
 WORLD_WIDTH = 6000
 
+#----------------------------------
+# UI INITIALISATION
+#----------------------------------
 statui = StatBarUI()
 menu_ui = MenuUI(screen)
 inventory_ui = InventoryUI(screen)
 loot_sys = LootSystem()
+dialogue_ui = DialogueUI(screen)
+
+
+#----------------------------------
+# SYSTEM klaarzetten
+#----------------------------------
 
 spawner = EnemySpawner(
     pool=config.ENEMY_POOL,
@@ -53,7 +64,12 @@ spawner = EnemySpawner(
 wave_sys = WaveSystem(waves=config.WAVES, break_time=4.0)
 wave_sys.start()
 
+def start_intro():
+    global state
 
+    dialogue_ui.start(get_intro_lines())
+    state = "INTRO"
+    
 def reset_game():
     spawner.reset()
     wave_sys.start()
@@ -63,13 +79,16 @@ def reset_game():
     pickups = []
     return player, projectiles, enemies, pickups
 
-
 player, projectiles, enemies, pickups = reset_game()
 
+#----------------------------------
+# Actual runnning
+#----------------------------------
 running = True
 while running:
     dt = clock.tick(60) / 1000.0
     keys = pygame.key.get_pressed()
+    ui_used_click_this_frame = False
 
     # --------------------------------------------------
     # EVENTS
@@ -79,15 +98,23 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+            break
 
         # --- MAIN SCREEN ---
         if state == "MAIN":
             action = main_screen.handle_event(event)
             if action == "PLAY":
-                state = "PLAY"
-            continue  # blijf in main screen event handling
+                start_intro()
+            continue
 
-        # --- IN-GAME EVENTS ---
+        # --- INTRO (dialogue) ---
+        if state == "INTRO":
+            dialogue_ui.handle_event(event)  
+            if dialogue_ui.is_done():       
+                state = "PLAY"
+            continue
+
+        # --- IN-GAME EVENTS (PLAY) ---
         if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
             if player.dead:
                 player, projectiles, enemies, pickups = reset_game()
@@ -114,6 +141,14 @@ while running:
     if state == "MAIN":
         main_screen.update(dt)
         main_screen.draw()
+        pygame.display.flip()
+        continue
+    
+    if state == "INTRO":
+        screen.fill((10, 10, 10))
+
+        dialogue_ui.update(dt)
+        dialogue_ui.draw()
         pygame.display.flip()
         continue
 
