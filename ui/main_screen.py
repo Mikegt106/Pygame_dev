@@ -58,12 +58,12 @@ class MainScreen:
         self.screen.blit(self.overlay, (0, 0))
 
         # title
-        title = self.title_font.render("MONSTER SIEGE", True, (255, 255, 255))
+        title = self.title_font.render("Quiet Before the Bell", True, (255, 255, 255))
         tr = title.get_rect(center=(self.w // 2, int(self.h * 0.28)))
         self.screen.blit(title, tr)
 
         subtitle = self.small_font.render(
-            "Survive the waves. Face the horde.",
+            "The Silence Doesn’t Last",
             True,
             (220, 220, 220),
         )
