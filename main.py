@@ -200,6 +200,7 @@ while running:
         screen.blit(toast, rect)
 
     statui.draw(screen)
+    menu_ui.update()
     menu_ui.draw()
     player.draw(screen)
 
