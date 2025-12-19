@@ -89,7 +89,8 @@ while running:
 
         # --- IN-GAME EVENTS ---
         if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-            player, projectiles, enemies, pickups = reset_game()
+            if player.dead:
+                player, projectiles, enemies, pickups = reset_game()
 
         used_ui, clicked = menu_ui.handle_event(event)
         if used_ui:
