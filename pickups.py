@@ -15,6 +15,15 @@ def _scale_image(img: pygame.Surface, scale: float) -> pygame.Surface:
 
 
 # ==========================================================
+# COIN PICKUP SOUND
+# ==========================================================
+pygame.mixer.init()
+
+COIN_SOUND = pygame.mixer.Sound("assets/Sounds/coins.mp3")
+COIN_SOUND.set_volume(0.6)
+
+
+# ==========================================================
 # BASE PICKUP (magnet + drop physics + bobbing)
 # ==========================================================
 class BasePickup:
@@ -183,6 +192,16 @@ class CoinPickup(BasePickup):
 
     def apply(self, player):
         player.coins = getattr(player, "coins", 0) + self.value
+        
+    def collect(self, player):
+        if self.collected:
+            return
+        
+        COIN_SOUND.play()
+
+        self.collected = True
+        self.apply(player)
+        self.remove = True
 
 
 # ==========================================================
